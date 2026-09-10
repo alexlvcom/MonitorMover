@@ -12,6 +12,13 @@ public static class Changelog
     /// <summary>Newest first. Each entry: version, date, and bullet notes.</summary>
     public static readonly (string Version, string Date, string[] Notes)[] Entries =
     {
+        ("1.1.12", "2026-09-10", new[]
+        {
+            "Fixed: moving Task Manager to another monitor had no effect when it was",
+            "     running with administrative rights. MonitorMover now requests Windows",
+            "     administrator permission at launch, so its move controls can reposition",
+            "     Task Manager and other elevated application windows.",
+        }),
         ("1.1.11", "2026-08-07", new[]
         {
             "Fixed: MonitorMover.exe had no icon, so Explorer, the Start menu and a",

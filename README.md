@@ -95,7 +95,9 @@ Output: `publish\MonitorMover.exe` (single-file, self-contained Windows x64 exec
 
 ## Use (GUI)
 
-Run `MonitorMover.exe`. Top panel = monitors, bottom panel = windows.
+Run `MonitorMover.exe` and approve the Windows administrator prompt. This lets
+MonitorMover move Task Manager and other elevated windows as well as ordinary
+applications. Top panel = monitors, bottom panel = windows.
 
 - **Find an app by keyword:** type into the **Filter apps** box to instantly narrow the list to windows whose title or process name contains what you typed — much faster than eyeballing a long list. Clear the box to show everything again.
 - **Filter by monitor:** click a monitor in the top pane to show only that monitor's windows below; right-click a monitor → *Show Windows On All Monitors* to clear the filter.
@@ -131,7 +133,9 @@ Double-click the right one when you sit down.
 
 ## Notes / limits
 
-- To move windows belonging to **elevated** apps, run MonitorMover as administrator.
+- MonitorMover requests administrator permission at launch so it can move Task
+  Manager and other elevated apps. Canceling that prompt prevents the app from
+  starting.
 - Matching is by process name, so **all** windows of an app share its rule. Add a *Title Contains* filter only when one specific window needs a different monitor from the rest.
 - Minimized/maximized windows capture their **restore** position, so they land correctly when reopened.
 - **Upgrading over an older copy:** Windows caches executable icons, so an existing taskbar pin or shortcut may keep showing the old blank icon after replacing the exe. Unpin and re-pin it once — or run `ie4uinit.exe -show` — to refresh the cache.

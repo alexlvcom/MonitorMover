@@ -5,9 +5,9 @@
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
-        <!-- asInvoker keeps the app unelevated. It can move windows of same-or-lower
-             integrity processes. Elevated apps require running this tool as admin. -->
-        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
+        <!-- Task Manager and other administrative windows run at a higher integrity
+             level. Moving them is blocked by UIPI unless MonitorMover is elevated. -->
+        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
       </requestedPrivileges>
     </security>
   </trustInfo>
