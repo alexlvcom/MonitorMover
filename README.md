@@ -1,4 +1,4 @@
-# MonitorMover
+# Monitor Mover
 
 A lightweight .NET (WinForms) utility inspired by NirSoft's **MultiMonitorTool**.
 It does the two things you actually need — plus the features MultiMonitorTool lacks:
@@ -8,13 +8,13 @@ It does the two things you actually need — plus the features MultiMonitorTool 
 3. **Layout profiles** — save your current window arrangement as a named profile (e.g. **Home**, **Office**) and re-apply it in one click. No more dragging every app back to the right screen each morning when your monitor setup changes.
 4. **Search / filter apps by keyword** — no more scanning a long window list to find the one you want. Type any keyword in the **Filter apps** box and the list instantly narrows to every window whose title *or* process name contains it. Pick and move your app in a second.
 
-![MonitorMover main window](MonitorMover-screenshot.jpg)
+![Monitor Mover main window](MonitorMover-screenshot.jpg)
 
 ## Download
 
-Grab the latest **MonitorMover.exe** from the [Releases page](https://github.com/alexlvcom/monitor-mover/releases/latest) — or directly:
+Grab the latest **MonitorMover.exe** from the [Releases page](https://github.com/alexlvcom/MonitorMover/releases/latest) — or directly:
 
-**https://github.com/alexlvcom/monitor-mover/releases/latest/download/MonitorMover.exe**
+**https://github.com/alexlvcom/MonitorMover/releases/latest/download/MonitorMover.exe**
 
 It's a single, self-contained executable — **no .NET runtime install needed**. Just download and double-click.
 
@@ -32,11 +32,11 @@ Each release lists the SHA-256 of the exe. To check the file you downloaded matc
 Get-FileHash .\MonitorMover.exe -Algorithm SHA256
 ```
 
-Compare the output against the hash shown on that version's [release page](https://github.com/alexlvcom/monitor-mover/releases/latest).
+Compare the output against the hash shown on that version's [release page](https://github.com/alexlvcom/MonitorMover/releases/latest).
 
 ## When you need this
 
-Windows is notoriously bad at remembering where your windows belong when the display setup changes. MonitorMover is for the moments it gets it wrong:
+Windows is notoriously bad at remembering where your windows belong when the display setup changes. Monitor Mover is for the moments it gets it wrong:
 
 - **Switching between home and work.** Your desk at the office and your desk at home have different monitor counts, resolutions, or arrangements. Plug in at either place and Windows scatters your apps onto whatever screen it likes. Save a **Home** profile and an **Office** profile once, then apply the right one when you sit down and every app snaps back to its correct screen, position, size, and state.
 - **On a single PC, after a monitor was disconnected/reconnected.** Undocking a laptop, a monitor going to sleep, waking from standby, or a cable getting bumped makes Windows collapse everything onto one screen or pile windows up misaligned. Instead of dragging each app back by hand, apply your profile and the layout is repaired in one click.
@@ -96,7 +96,7 @@ Output: `publish\MonitorMover.exe` (single-file, self-contained Windows x64 exec
 ## Use (GUI)
 
 Run `MonitorMover.exe` and approve the Windows administrator prompt. This lets
-MonitorMover move Task Manager and other elevated windows as well as ordinary
+Monitor Mover move Task Manager and other elevated windows as well as ordinary
 applications. Top panel = monitors, bottom panel = windows.
 
 - **Find an app by keyword:** type into the **Filter apps** box to instantly narrow the list to windows whose title or process name contains what you typed — much faster than eyeballing a long list. Clear the box to show everything again.
@@ -133,7 +133,7 @@ Double-click the right one when you sit down.
 
 ## Notes / limits
 
-- MonitorMover requests administrator permission at launch so it can move Task
+- Monitor Mover requests administrator permission at launch so it can move Task
   Manager and other elevated apps. Canceling that prompt prevents the app from
   starting.
 - Matching is by process name, so **all** windows of an app share its rule. Add a *Title Contains* filter only when one specific window needs a different monitor from the rest.

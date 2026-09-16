@@ -32,21 +32,21 @@ internal static class Program
                 var names = store.Profiles.Count == 0
                     ? "(no profiles saved)"
                     : string.Join(Environment.NewLine, store.Profiles.Select(p => $"  {p.Name}  ({p.Rules.Count} rules)"));
-                MessageBox.Show("Saved profiles:\n\n" + names, "MonitorMover", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Saved profiles:\n\n" + names, "Monitor Mover", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return true;
 
             case "--apply":
             case "-a":
                 if (args.Length < 2)
                 {
-                    MessageBox.Show("Usage: MonitorMover.exe --apply \"ProfileName\"", "MonitorMover",
+                    MessageBox.Show("Usage: MonitorMover.exe --apply \"ProfileName\"", "Monitor Mover",
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return true;
                 }
                 var profile = store.Find(args[1]);
                 if (profile == null)
                 {
-                    MessageBox.Show($"Profile \"{args[1]}\" not found.", "MonitorMover",
+                    MessageBox.Show($"Profile \"{args[1]}\" not found.", "Monitor Mover",
                         MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return true;
                 }
@@ -63,7 +63,7 @@ internal static class Program
             case "-c":
                 if (args.Length < 2)
                 {
-                    MessageBox.Show("Usage: MonitorMover.exe --capture \"ProfileName\"", "MonitorMover",
+                    MessageBox.Show("Usage: MonitorMover.exe --capture \"ProfileName\"", "Monitor Mover",
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return true;
                 }

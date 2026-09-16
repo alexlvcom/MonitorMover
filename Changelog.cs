@@ -12,10 +12,19 @@ public static class Changelog
     /// <summary>Newest first. Each entry: version, date, and bullet notes.</summary>
     public static readonly (string Version, string Date, string[] Notes)[] Entries =
     {
+        ("1.1.13", "2026-09-16", new[]
+        {
+            "Changed: the app now calls itself \"Monitor Mover\" everywhere you read it —",
+            "     the window title, this About box and every dialog caption. The one-word",
+            "     form stays where it is an identifier: MonitorMover.exe, the GitHub",
+            @"     repository, and the %APPDATA%\MonitorMover profile folder.",
+            "The GitHub repository moved from alexlvcom/monitor-mover to",
+            "     alexlvcom/MonitorMover. Old links still redirect.",
+        }),
         ("1.1.12", "2026-09-10", new[]
         {
             "Fixed: moving Task Manager to another monitor had no effect when it was",
-            "     running with administrative rights. MonitorMover now requests Windows",
+            "     running with administrative rights. Monitor Mover now requests Windows",
             "     administrator permission at launch, so its move controls can reposition",
             "     Task Manager and other elevated application windows.",
         }),
@@ -40,7 +49,7 @@ public static class Changelog
             "New: closed apps are listed as \"kept\" in the change table, so it is clear",
             "     the profile still remembers them.",
             "Fixed: the layout is now read fresh when saving, instead of using the window",
-            "     list from the last refresh — MonitorMover's own window could be missing",
+            "     list from the last refresh — Monitor Mover's own window could be missing",
             "     from a snapshot taken before the main window appeared.",
             "The headless --capture command merges the same way.",
         }),
@@ -182,7 +191,7 @@ public static class Changelog
     {
         var lines = new List<string>
         {
-            $"MonitorMover  v{MarketingVersion}",
+            $"Monitor Mover  v{MarketingVersion}",
             $"Build {BuildVersion}" +
                 (BuildDate == DateTime.MinValue ? "" : $"   (built {BuildDate:yyyy-MM-dd HH:mm})"),
             "",

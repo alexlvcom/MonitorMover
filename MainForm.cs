@@ -33,7 +33,7 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = $"MonitorMover  v{Changelog.MarketingVersion}";
+        Text = $"Monitor Mover  v{Changelog.MarketingVersion}";
         AppIcon.Apply(this);
         Width = 1200;
         Height = 780;
@@ -708,6 +708,6 @@ public sealed class MainForm : Form
         var text = Changelog.FormatFull() +
                    Environment.NewLine + Environment.NewLine +
                    "Profiles file:" + Environment.NewLine + _store.FilePath;
-        ResultViewer.Show($"About MonitorMover — v{Changelog.MarketingVersion}", text.Split('\n').Select(l => l.TrimEnd('\r')));
+        ResultViewer.Show($"About Monitor Mover — v{Changelog.MarketingVersion}", text.Split('\n').Select(l => l.TrimEnd('\r')));
     }
 }
