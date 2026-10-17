@@ -10,14 +10,18 @@
 
 ## Install and first run
 
-Download **[MonitorMover.exe](https://github.com/alexlvcom/MonitorMover/releases/latest/download/MonitorMover.exe)**
+Download **[MonitorMover-Setup.exe](https://github.com/alexlvcom/MonitorMover/releases/latest/download/MonitorMover-Setup.exe)**
 from the [releases page](https://github.com/alexlvcom/MonitorMover/releases/latest).
-It is a single self-contained executable — no .NET runtime install needed. Just
-download and double-click.
+
+The installer installs Monitor Mover into `%LOCALAPPDATA%\Programs\Monitor Mover` without requiring administrator privileges for setup. During upgrades, it gracefully closes any running copy and restarts the application after updating. It also provides optional Start menu, desktop, and startup shortcuts.
+
+### Updates
+
+Monitor Mover includes automatic update checking against GitHub releases. In **File → Settings…**, you can configure how frequently the app checks for updates (hourly, daily, weekly, monthly, or never), or trigger a manual check anytime via **File → Settings…**, **Help → Check for Updates…**, or in the **About** window. Updates verify the SHA-256 hash before running the installer.
 
 ### Windows SmartScreen
 
-The exe is **unsigned** (there is no paid code-signing certificate for a free
+The installer is **unsigned** (there is no paid code-signing certificate for a free
 hobby tool), so Windows may show **"Windows protected your PC."** This is *not* a
 virus warning — it only means the file is new and has not built up download
 reputation yet. Click **More info → Run anyway**.
@@ -27,13 +31,13 @@ and build it yourself.
 
 ### Verifying the download
 
-Each release lists the SHA-256 of the exe:
+Each release lists the SHA-256 in `SHA256SUMS.txt`:
 
 ```powershell
-Get-FileHash .\MonitorMover.exe -Algorithm SHA256
+Get-FileHash .\MonitorMover-Setup.exe -Algorithm SHA256
 ```
 
-Compare it against the hash on that version's
+Compare it against `SHA256SUMS.txt` on that version's
 [release page](https://github.com/alexlvcom/MonitorMover/releases/latest).
 
 ### Administrator rights
@@ -170,7 +174,9 @@ when you sit down.
 
 ## Where your data lives
 
-`%APPDATA%\MonitorMover\profiles.json` — human-readable; edit or back it up freely.
+- `%APPDATA%\MonitorMover\profiles.json` — saved profiles (human-readable JSON; edit or back it up freely).
+- `%APPDATA%\MonitorMover\settings.json` — application settings including update check schedule.
+
 *File → Open Profiles Folder* jumps there.
 
 ## Notes and limits

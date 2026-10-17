@@ -1,183 +1,41 @@
+using System.IO;
 using System.Reflection;
+using System.Text.RegularExpressions;
 
 namespace MonitorMover;
 
 /// <summary>
-/// App version info and human-readable change history shown in Help → About.
-/// Add a new entry at the top of <see cref="Entries"/> whenever behaviour changes,
-/// and bump &lt;VersionPrefix&gt; in the .csproj to match.
+/// App version info and release notes loaded from embedded CHANGELOG.md.
 /// </summary>
 public static class Changelog
 {
-    /// <summary>Newest first. Each entry: version, date, and bullet notes.</summary>
-    public static readonly (string Version, string Date, string[] Notes)[] Entries =
-    {
-        ("1.1.13", "2026-09-16", new[]
-        {
-            "Changed: the app now calls itself \"Monitor Mover\" everywhere you read it —",
-            "     the window title, this About box and every dialog caption. The one-word",
-            "     form stays where it is an identifier: MonitorMover.exe, the GitHub",
-            @"     repository, and the %APPDATA%\MonitorMover profile folder.",
-            "The GitHub repository moved from alexlvcom/monitor-mover to",
-            "     alexlvcom/MonitorMover. Old links still redirect.",
-        }),
-        ("1.1.12", "2026-09-10", new[]
-        {
-            "Fixed: moving Task Manager to another monitor had no effect when it was",
-            "     running with administrative rights. Monitor Mover now requests Windows",
-            "     administrator permission at launch, so its move controls can reposition",
-            "     Task Manager and other elevated application windows.",
-        }),
-        ("1.1.11", "2026-08-07", new[]
-        {
-            "Fixed: MonitorMover.exe had no icon, so Explorer, the Start menu and a",
-            "     taskbar pin all showed the blank generic-application placeholder — the",
-            "     icon only appeared once the app was running.",
-            "New: the app now has its own icon (a monitor with a move arrow), embedded in",
-            "     the executable at every size Windows asks for, from 16×16 up to 256×256.",
-            "     All windows — main, profile editor and the small dialogs — use it too.",
-        }),
-        ("1.1.10", "2026-07-29", new[]
-        {
-            "Fixed: saving the current layout over a profile dropped every app that was",
-            "     not running at that moment, so a closed app lost its monitor and opened",
-            "     wherever Windows chose next time. A capture is now merged into the",
-            "     profile: running apps have their rule refreshed, closed apps keep",
-            "     theirs, and new apps are added. Removing an app stays deliberate —",
-            "     select its row and use Remove Selected Rows.",
-            "Re-capturing also no longer switches a rule the user had turned off back on.",
-            "New: closed apps are listed as \"kept\" in the change table, so it is clear",
-            "     the profile still remembers them.",
-            "Fixed: the layout is now read fresh when saving, instead of using the window",
-            "     list from the last refresh — Monitor Mover's own window could be missing",
-            "     from a snapshot taken before the main window appeared.",
-            "The headless --capture command merges the same way.",
-        }),
-        ("1.1.9", "2026-07-29", new[]
-        {
-            "Fixed: applying a profile moved only one window of an app, leaving other",
-            "     instances behind on the wrong monitor. A rule now places EVERY open",
-            "     window of its executable — all Chrome windows, all Evernote notes, all",
-            "     PhpStorm projects go to the app's monitor.",
-            "Profiles now store one rule per executable instead of one per window;",
-            "     profiles saved earlier are folded down to that automatically on load.",
-            "     Extra instances of a normal-state window are cascaded slightly so they",
-            "     don't sit exactly on top of each other.",
-            "A \"Title Contains\" filter still gives one particular window a target of its",
-            "     own, and such rules are applied before the app's general rule.",
-            "New: updating a profile (Save Current Layout, or Edit) now shows a colour-",
-            "     coded comparison table in the dialog, above the Save button: green for",
-            "     added apps, red for removed, amber for changed, with only the fields",
-            "     that actually moved (monitor, state, position, size) highlighted.",
-            "     It refreshes live as rows are edited or the profile is renamed, and",
-            "     unchanged apps are collapsed into a count you can expand.",
-            "New: while nothing differs from the saved profile the Save button is disabled",
-            "     and reads \"Nothing to Save\", and a full-width banner spells it out — so a",
-            "     profile can no longer be overwritten with an identical copy, and the empty",
-            "     table area explains why instead of sitting blank.",
-        }),
-        ("1.1.8", "2026-07-28", new[]
-        {
-            "Fixed: Save Current Layout now updates the selected profile directly",
-            "     instead of prompting for a new profile name such as \"Office\".",
-            "New: use Profiles → Save Current Layout as New Profile when a separate",
-            "     profile is wanted.",
-            "Fixed: toolbar and profile-editor button captions no longer clip on",
-            "     scaled displays.",
-            "Fixed: the profile name field no longer overlaps its label or hides the",
-            "     beginning of the name at higher DPI settings.",
-            "New: a Delete button beside Edit makes removing the selected profile",
-            "     available directly from the toolbar, with confirmation.",
-        }),
-        ("1.1.7", "2026-07-28", new[]
-        {
-            "Fixed: two monitors of the same resolution could not be told apart, so a",
-            "     profile could restore windows to the wrong one of the pair. Rules now",
-            "     also record the monitor's desktop-layout position (0,0 is always the",
-            "     primary) and match on it right after resolution.",
-            "Monitors are now numbered by layout — #1 is always the monitor at 0,0,",
-            "     then left-to-right — instead of by the device order Windows reshuffles",
-            "     on re-dock. The profile editor's monitor list shows the position too.",
-        }),
-        ("1.1.6", "2026-07-28", new[]
-        {
-            "New: the window list now shows each app's icon next to its title,",
-            "     like MultiMonitorTool. Icons are read from the window (best for",
-            "     packaged/UWP apps) with the executable's icon as a fallback.",
-        }),
-        ("1.1.5", "2026-07-28", new[]
-        {
-            "Fixed: applying a profile after unplugging and reconnecting monitors sent",
-            "     most windows to the primary screen. Windows reassigns display device",
-            "     names on re-dock, so rules are now matched to monitors by resolution",
-            "     and primary state first, with device name/index only breaking ties.",
-        }),
-        ("1.1.4", "2026-07-22", new[]
-        {
-            "Fixed: profile-bar button captions were clipped at the bottom on scaled",
-            "     displays; the toolbar now auto-sizes its controls at any DPI.",
-        }),
-        ("1.1.3", "2026-07-22", new[]
-        {
-            "Layout: the monitors pane now defaults to ~14% of the height so the window",
-            "     list gets most of the space; drag the splitter to adjust as before.",
-        }),
-        ("1.1.2", "2026-07-22", new[]
-        {
-            "New: filter the window list by typing — click any window, then start typing",
-            "     and the list narrows to windows whose title/process contains the text.",
-            "New: a 'Filter apps' text box above the window list does the same.",
-            "     Esc or clearing the box removes the filter. Combines with the monitor filter.",
-            "Window header shows matched/total counts.",
-        }),
-        ("1.1.1", "2026-07-22", new[]
-        {
-            "Fixed: 'Move To Next Monitor' / 'Move To Primary Monitor' now work for",
-            "     maximized (and minimized) windows — they previously spilled off the",
-            "     target monitor instead of maximizing on it.",
-            "Moves now use SetWindowPlacement, reliable across mixed resolution/DPI.",
-            "Applying a profile restores maximized windows onto the correct monitor too.",
-        }),
-        ("1.1.0", "2026-07-22", new[]
-        {
-            "Fixed: top pane now shows ALL monitors (menu/toolbar were overlapping the first row).",
-            "New: click a monitor in the top pane to filter the window list to that monitor;",
-            "     right-click a monitor for 'Show Windows On This Monitor' / 'Show All Monitors'.",
-            "New: Help → About now shows the build version and this change history.",
-            "Window count is shown in the Windows section header.",
-        }),
-        ("1.0.0", "2026-07-22", new[]
-        {
-            "Initial release.",
-            "Detect monitors and list all application windows.",
-            "Move a window to the next / primary / a specific monitor (F8 / F7 / right-click).",
-            "Save the current window layout as a named profile (e.g. Home, Office).",
-            "Apply a profile in one click to restore every app to its monitor/position/state.",
-            "Command line: --list, --capture, --apply, --dump.",
-        }),
-    };
+    private static readonly Lazy<(string FullText, List<(string Version, string Date, string[] Notes)> Entries)> _parsed =
+        new(LoadFromResource);
 
-    /// <summary>Marketing version, e.g. "1.1.0" (from the newest changelog entry).</summary>
-    public static string MarketingVersion => Entries[0].Version;
+    public static (string Version, string Date, string[] Notes)[] Entries => _parsed.Value.Entries.ToArray();
 
-    /// <summary>Full build version including the auto-incrementing build/revision.</summary>
+    public static string MarketingVersion =>
+        _parsed.Value.Entries.Count > 0 ? _parsed.Value.Entries[0].Version : "1.2.0";
+
     public static string BuildVersion
     {
         get
         {
             var v = Assembly.GetExecutingAssembly().GetName().Version;
-            return v?.ToString() ?? MarketingVersion;
+            if (v != null)
+            {
+                return $"{v.Major}.{v.Minor}.{v.Build}";
+            }
+            return MarketingVersion;
         }
     }
 
-    /// <summary>Timestamp this executable was built (from the PE linker header).</summary>
     public static DateTime BuildDate
     {
         get
         {
             try
             {
-                // Works for single-file publish (Assembly.Location is empty there).
                 string path = Environment.ProcessPath ?? "";
                 if (!string.IsNullOrEmpty(path) && File.Exists(path))
                     return File.GetLastWriteTime(path);
@@ -187,29 +45,83 @@ public static class Changelog
         }
     }
 
+    public static string GetReleaseNotes(string version)
+    {
+        var entry = _parsed.Value.Entries.FirstOrDefault(e => e.Version == version);
+        if (entry.Notes != null && entry.Notes.Length > 0)
+        {
+            return string.Join(Environment.NewLine, entry.Notes);
+        }
+        return "No release notes available for this version.";
+    }
+
     public static string FormatFull()
     {
-        var lines = new List<string>
-        {
-            $"Monitor Mover  v{MarketingVersion}",
-            $"Build {BuildVersion}" +
-                (BuildDate == DateTime.MinValue ? "" : $"   (built {BuildDate:yyyy-MM-dd HH:mm})"),
-            "",
-            "Detect monitors, move application windows between them, and save/apply",
-            "layout profiles (e.g. Home vs Office) so your windows snap back to the",
-            "right monitors in one click.",
-            "",
-            "What's changed",
-            "──────────────",
-        };
+        return _parsed.Value.FullText;
+    }
 
-        foreach (var (version, date, notes) in Entries)
+    private static (string FullText, List<(string Version, string Date, string[] Notes)> Entries) LoadFromResource()
+    {
+        var asm = Assembly.GetExecutingAssembly();
+        using var stream = asm.GetManifestResourceStream("CHANGELOG.md")
+            ?? asm.GetManifestResourceStream("MonitorMover.CHANGELOG.md");
+        string markdown = "";
+        if (stream != null)
         {
-            lines.Add("");
-            lines.Add($"v{version}  ({date})");
-            foreach (var n in notes)
-                lines.Add("  • " + n);
+            using var reader = new StreamReader(stream);
+            markdown = reader.ReadToEnd();
         }
-        return string.Join(Environment.NewLine, lines);
+
+        var entries = new List<(string Version, string Date, string[] Notes)>();
+        if (string.IsNullOrWhiteSpace(markdown))
+        {
+            return (markdown, entries);
+        }
+
+        var lines = markdown.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+        string? currentVersion = null;
+        string? currentDate = null;
+        var currentNotes = new List<string>();
+
+        var headerRegex = new Regex(@"^##\s+([0-9]+\.[0-9]+\.[0-9]+)\s+-\s+([0-9]{4}-[0-9]{2}-[0-9]{2})");
+
+        foreach (var line in lines)
+        {
+            var match = headerRegex.Match(line);
+            if (match.Success)
+            {
+                if (currentVersion != null)
+                {
+                    entries.Add((currentVersion, currentDate ?? "", currentNotes.ToArray()));
+                    currentNotes.Clear();
+                }
+                currentVersion = match.Groups[1].Value;
+                currentDate = match.Groups[2].Value;
+                continue;
+            }
+
+            if (currentVersion != null)
+            {
+                if (line.StartsWith("## "))
+                {
+                    entries.Add((currentVersion, currentDate ?? "", currentNotes.ToArray()));
+                    currentVersion = null;
+                    currentNotes.Clear();
+                    continue;
+                }
+
+                if (!string.IsNullOrWhiteSpace(line))
+                {
+                    currentNotes.Add(line);
+                }
+            }
+        }
+
+        if (currentVersion != null)
+        {
+            entries.Add((currentVersion, currentDate ?? "", currentNotes.ToArray()));
+        }
+
+        return (markdown, entries);
     }
 }

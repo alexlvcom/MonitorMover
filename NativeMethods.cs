@@ -58,6 +58,9 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool SetForegroundWindow(IntPtr hWnd);
 
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    public static extern IntPtr FindWindow(string? lpClassName, string? lpWindowName);
+
     [DllImport("user32.dll")]
     public static extern bool IsIconic(IntPtr hWnd);
 

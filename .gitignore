@@ -3,6 +3,7 @@
 [Oo]bj/
 [Oo]ut/
 publish/
+dist/
 *.user
 
 # Rider / VS

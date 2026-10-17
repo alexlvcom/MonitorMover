@@ -31,13 +31,32 @@ public sealed class MainForm : Form
     /// <summary>Free-text substring to match against window title / process name.</summary>
     private string _textFilter = "";
 
+    private readonly AppSettings _settings = AppSettings.Load();
+    private readonly UpdateService _updates = new();
+    private readonly CancellationTokenSource _updateCancellation = new();
+    private readonly System.Windows.Forms.Timer _updateTimer = new();
+    private DateTime _nextUpdateCheckUtc = DateTime.MaxValue;
+    private bool _checkingUpdate;
+    private Version? _lastOfferedUpdate;
+    private ShutdownListenerWindow? _listenerWindow;
+
     public MainForm()
     {
-        Text = $"Monitor Mover  v{Changelog.MarketingVersion}";
+        Text = $"Monitor Mover (v{Changelog.MarketingVersion})";
         AppIcon.Apply(this);
         Width = 1200;
         Height = 780;
         StartPosition = FormStartPosition.CenterScreen;
+
+        _updateTimer.Interval = (int)TimeSpan.FromMinutes(15).TotalMilliseconds;
+        _updateTimer.Tick += async (_, _) =>
+        {
+            if (DateTime.UtcNow >= _nextUpdateCheckUtc)
+            {
+                await CheckForUpdatesAsync(manual: false);
+                _nextUpdateCheckUtc = UpdateSchedule.NextCheck(DateTime.UtcNow, _settings.UpdateCheckFrequency);
+            }
+        };
 
         // Deterministic layout via a TableLayoutPanel — rows never overlap, unlike
         // ambiguous Dock z-ordering.
@@ -69,7 +88,38 @@ public sealed class MainForm : Form
         {
             RefreshAll();
             SizeMonitorPane();
+
+            _listenerWindow = new ShutdownListenerWindow(() =>
+            {
+                if (!IsDisposed)
+                {
+                    try { BeginInvoke(new Action(() => Close())); }
+                    catch { Close(); }
+                }
+            });
+            _listenerWindow.Show();
+
+            ApplyUpdateSchedule();
+            if (_settings.UpdateCheckFrequency != UpdateCheckFrequency.Never)
+            {
+                _ = CheckForUpdatesAsync(manual: false);
+            }
         };
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _updateTimer.Stop();
+            _updateTimer.Dispose();
+            _updateCancellation.Cancel();
+            _updateCancellation.Dispose();
+            _updates.Dispose();
+            _listenerWindow?.Dispose();
+            _windowIcons.Dispose();
+        }
+        base.Dispose(disposing);
     }
 
     /// <summary>
@@ -102,6 +152,7 @@ public sealed class MainForm : Form
         file.DropDownItems.Add(new ToolStripMenuItem("&Refresh", null, (_, _) => RefreshAll()) { ShortcutKeys = Keys.F5 });
         file.DropDownItems.Add(new ToolStripSeparator());
         file.DropDownItems.Add("Open Profiles &Folder", null, (_, _) => OpenProfilesFolder());
+        file.DropDownItems.Add("&Settings…", null, (_, _) => ShowSettings());
         file.DropDownItems.Add(new ToolStripSeparator());
         file.DropDownItems.Add("E&xit", null, (_, _) => Close());
 
@@ -121,6 +172,8 @@ public sealed class MainForm : Form
         profiles.DropDownItems.Add("&Delete Selected Profile", null, (_, _) => DeleteSelectedProfile());
 
         var help = new ToolStripMenuItem("&Help");
+        help.DropDownItems.Add("&Check for Updates…", null, async (_, _) => await CheckForUpdatesAsync(manual: true));
+        help.DropDownItems.Add(new ToolStripSeparator());
         help.DropDownItems.Add("&About", null, (_, _) => ShowAbout());
 
         menu.Items.AddRange(new ToolStripItem[] { file, window, profiles, help });
@@ -703,11 +756,107 @@ public sealed class MainForm : Form
         catch { /* ignore */ }
     }
 
+    private void ShowSettings()
+    {
+        using var form = new SettingsForm(_settings, () => CheckForUpdatesAsync(manual: true));
+        if (form.ShowDialog(this) == DialogResult.OK)
+        {
+            ApplyUpdateSchedule();
+        }
+    }
+
     private void ShowAbout()
     {
-        var text = Changelog.FormatFull() +
-                   Environment.NewLine + Environment.NewLine +
-                   "Profiles file:" + Environment.NewLine + _store.FilePath;
-        ResultViewer.Show($"About Monitor Mover — v{Changelog.MarketingVersion}", text.Split('\n').Select(l => l.TrimEnd('\r')));
+        using var form = new AboutForm(() => CheckForUpdatesAsync(manual: true));
+        form.ShowDialog(this);
+    }
+
+    private void ApplyUpdateSchedule()
+    {
+        _settings.UpdateCheckFrequency = UpdateSchedule.Normalize(_settings.UpdateCheckFrequency);
+        _updateTimer.Stop();
+        _nextUpdateCheckUtc = UpdateSchedule.NextCheck(DateTime.UtcNow, _settings.UpdateCheckFrequency);
+        if (_settings.UpdateCheckFrequency != UpdateCheckFrequency.Never) _updateTimer.Start();
+    }
+
+    private async Task CheckForUpdatesAsync(bool manual)
+    {
+        if (_checkingUpdate || IsDisposed || (!manual && _settings.UpdateCheckFrequency == UpdateCheckFrequency.Never)) return;
+        _checkingUpdate = true;
+        try
+        {
+            var update = await _updates.CheckAsync(Version.Parse(Changelog.MarketingVersion), _updateCancellation.Token);
+            if (IsDisposed) return;
+            if (update is null)
+            {
+                if (manual) MessageBox.Show(this, $"You are running version {Changelog.MarketingVersion}.\n\nNo newer installer version is available.", "Monitor Mover", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            if (!manual && _lastOfferedUpdate == update.Version) return;
+            _lastOfferedUpdate = update.Version;
+            ShowUpdateDialog(update);
+        }
+        catch (OperationCanceledException) when (IsDisposed) { }
+        catch (Exception ex)
+        {
+            if (IsDisposed) return;
+            if (manual) MessageBox.Show(this, $"Could not check for updates. Please try again later.\n\n{ex.Message}", "Monitor Mover", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+        finally { _checkingUpdate = false; }
+    }
+
+    private void ShowUpdateDialog(AppUpdate update)
+    {
+        using var dialog = new Form
+        {
+            Text = $"Update Monitor Mover (v{Changelog.MarketingVersion})",
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            ShowInTaskbar = false,
+            ClientSize = new Size(470, 200),
+        };
+        AppIcon.Apply(dialog);
+        var message = new Label
+        {
+            Text = $"Version {update.Version} is available. You have {Changelog.MarketingVersion}.\n\nUpdate will download and open the installer. Setup will close the app and restart it after updating.",
+            Location = new Point(18, 18),
+            Size = new Size(434, 115),
+        };
+        var install = new Button { Text = "Update", Location = new Point(268, 152), Size = new Size(88, 30) };
+        var later = new Button { Text = "Later", Location = new Point(364, 152), Size = new Size(88, 30), DialogResult = DialogResult.Cancel };
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_updateCancellation.Token);
+        cancellation.CancelAfter(TimeSpan.FromMinutes(10));
+        dialog.FormClosing += (_, _) => cancellation.Cancel();
+        install.Click += async (_, _) =>
+        {
+            install.Enabled = false;
+            message.Text = "Downloading and verifying the installer…";
+            try
+            {
+                var cache = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MonitorMover", "Updates");
+                var installer = await _updates.DownloadAsync(update, cache, cancellation.Token);
+                if (IsDisposed || dialog.IsDisposed) return;
+                _ = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = installer,
+                    UseShellExecute = true,
+                }) ?? throw new InvalidOperationException("Windows could not open the installer.");
+                dialog.Close();
+                // Stay running until setup requests exit so cancelling setup leaves the app usable.
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+            catch (Exception ex)
+            {
+                if (IsDisposed || dialog.IsDisposed) return;
+                message.Text = $"Update failed. Please try again.\n\n{ex.Message}";
+                install.Enabled = true;
+            }
+        };
+        dialog.Controls.AddRange(new Control[] { message, install, later });
+        dialog.AcceptButton = install;
+        dialog.CancelButton = later;
+        dialog.ShowDialog(this);
     }
 }

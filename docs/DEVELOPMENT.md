@@ -1,45 +1,57 @@
 # Monitor Mover — development
 
-Requires the .NET 8 SDK. Nothing else.
+Requires the .NET 8 SDK and Inno Setup 6 (for building the installer).
 
-## Build and publish
+## Build installer and publish
+
+Build the Windows installer package:
 
 ```powershell
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o publish
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/build-installer.ps1
 ```
 
-Output: `publish\MonitorMover.exe` — the same single-file, self-contained Windows
-x64 executable the releases ship.
+Outputs:
+- `dist/MonitorMover-Setup.exe` — the Inno Setup installer targeting `%LOCALAPPDATA%\Programs\Monitor Mover`.
+- `dist/SHA256SUMS.txt` — SHA-256 hash of the installer.
+
+Run the update logic test suite:
+
+```powershell
+dotnet run --project tests/Updater.Tests.csproj -c Release
+```
 
 ## Project layout
 
-Flat, one file per concern, no designer files:
+Flat, one file per concern:
 
 ```
-MainForm.cs           main window: monitor pane, window list, filtering
-ProfileEditorForm.cs  profile editor and the change-comparison table
-Profile.cs            profile model, capture/merge/apply, monitor matching
-WindowManager.cs      window enumeration and movement
-NativeMethods.cs      P/Invoke surface
-Changelog.cs          version constants and the change history shown in About
-Program.cs            entry point and the command-line modes
+MainForm.cs               main window: monitor pane, window list, filtering, update checks
+SettingsForm.cs           settings dialog: update check frequency selector, profiles folder
+AboutForm.cs              about dialog: version, executable/data paths, release notes, update check
+ShutdownListenerWindow.cs hidden window handling WM_CLOSE for graceful installer shutdown
+UpdateService.cs          GitHub release discovery, download, and SHA-256 verification
+UpdateSchedule.cs         update interval calculations (hourly, daily, weekly, monthly, never)
+AppSettings.cs            user configuration persistence in %APPDATA%\MonitorMover\settings.json
+ProfileEditorForm.cs      profile editor and change-comparison table
+Profile.cs                profile model, capture/merge/apply, monitor matching
+WindowManager.cs          window enumeration and movement
+NativeMethods.cs          P/Invoke surface
+Changelog.cs              embedded CHANGELOG.md reader and version accessor
+Program.cs                entry point, single-instance mutex, and command-line modes
+installer/                Inno Setup script (MonitorMover.iss)
+scripts/                  build-installer.ps1
+tests/                    updater test suite
 ```
 
 ## Versioning
 
-The marketing version lives in two places that must agree:
+The release version lives in `MonitorMover.csproj` and `CHANGELOG.md`, which must agree:
 
-- `<VersionPrefix>` and `<FileVersion>` in `MonitorMover.csproj`
-- the newest entry at the top of `Entries` in `Changelog.cs`
+- `Version`, `InformationalVersion`, `FileVersion`, and `AssemblyVersion` in `MonitorMover.csproj`
+- The top entry in `CHANGELOG.md`
 
-Add a changelog entry whenever behaviour changes and bump both. `AssemblyVersion`
-is intentionally a wildcard (`1.1.*`) with `Deterministic=false`, so the About box
-shows a distinct build number per build.
+Always use exact `N.N.N` release versions. Do not use wildcards, auto-incrementing build revisions, or commit hashes in the release version.
 
 ## Naming
 
-The spaced name **Monitor Mover** is what the user reads: window titles, the About
-box, dialog captions, `<Product>`, the README. The one-word `MonitorMover` is
-reserved for identifiers — the assembly, the executable, the namespace, and the
-`%APPDATA%\MonitorMover` profile folder, which must not change or existing profiles
-would be orphaned.
+The spaced name **Monitor Mover** is what the user reads: window titles, the About box, dialog captions, `<Product>`, and the README. The one-word `MonitorMover` is reserved for identifiers: the assembly, executable, namespace, mutex (`MonitorMover.Singleton`), shutdown listener (`MonitorMoverListener`), and the `%APPDATA%\MonitorMover` folder.

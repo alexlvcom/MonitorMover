@@ -17,6 +17,17 @@ internal static class Program
             if (RunCli(args)) return;
         }
 
+        using var mutex = new Mutex(initiallyOwned: true, name: "MonitorMover.Singleton", createdNew: out var createdNew);
+        if (!createdNew)
+        {
+            var hwnd = NativeMethods.FindWindow(null, $"Monitor Mover (v{Changelog.MarketingVersion})");
+            if (hwnd != IntPtr.Zero)
+            {
+                NativeMethods.SetForegroundWindow(hwnd);
+            }
+            return;
+        }
+
         Application.Run(new MainForm());
     }
 

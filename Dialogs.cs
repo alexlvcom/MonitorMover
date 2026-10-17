@@ -50,12 +50,19 @@ public static class ResultViewer
             ScrollBars = ScrollBars.Both,
             WordWrap = false,
             Font = new System.Drawing.Font("Consolas", 9f),
-            Text = string.Join(Environment.NewLine, lines)
+            Text = string.Join(Environment.NewLine, lines),
+            TabStop = false
         };
-        var close = new Button { Text = "Close", Dock = DockStyle.Bottom, Height = 32, DialogResult = DialogResult.OK };
+        var close = new Button { Text = "Close", Dock = DockStyle.Bottom, Height = 32, DialogResult = DialogResult.OK, TabIndex = 0 };
         form.Controls.Add(box);
         form.Controls.Add(close);
         form.AcceptButton = close;
+        form.CancelButton = close;
+        form.Shown += (_, _) =>
+        {
+            box.Select(0, 0);
+            close.Focus();
+        };
         form.ShowDialog();
     }
 }

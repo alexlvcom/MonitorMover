@@ -14,18 +14,18 @@
     <ApplicationIcon>MonitorMover.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <Product>Monitor Mover</Product>
-    <!-- Marketing version: bump the first three parts when the changelog gains an entry. -->
-    <VersionPrefix>1.1.13</VersionPrefix>
-    <!-- Wildcard build/revision auto-changes on every build (needs Deterministic=false),
-         so the About box shows a distinct version per build. -->
-    <AssemblyVersion>1.1.*</AssemblyVersion>
-    <Deterministic>false</Deterministic>
-    <FileVersion>1.1.13.0</FileVersion>
+    <Version>1.2.0</Version>
+    <InformationalVersion>1.2.0</InformationalVersion>
+    <FileVersion>1.2.0.0</FileVersion>
+    <AssemblyVersion>1.2.0.0</AssemblyVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="tests/**/*.cs" />
     <!-- Same file again as a managed resource, so the windows can use it at runtime. -->
     <EmbeddedResource Include="MonitorMover.ico" LogicalName="MonitorMover.ico" />
+    <EmbeddedResource Include="CHANGELOG.md" LogicalName="CHANGELOG.md" />
   </ItemGroup>
 
 </Project>

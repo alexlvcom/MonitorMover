@@ -21,16 +21,17 @@ profile once, then apply the right one when you sit down.
 
 ## Install
 
-Download **[MonitorMover.exe](https://github.com/alexlvcom/MonitorMover/releases/latest/download/MonitorMover.exe)**
-and double-click it. It is a single self-contained executable — no .NET runtime
-needed, no installer.
+Download **[MonitorMover-Setup.exe](https://github.com/alexlvcom/MonitorMover/releases/latest/download/MonitorMover-Setup.exe)**
+and run it.
 
-It asks for administrator rights at launch so it can move Task Manager and other
-elevated windows.
+- Installs to `%LOCALAPPDATA%\Programs\Monitor Mover` without requiring administrator privileges for installation.
+- Closes the running application cleanly during upgrades and automatically restarts it.
+- Automatically checks for updates on a configurable schedule (daily by default, hourly, weekly, monthly, or never).
+- Preserves all your saved profiles and settings during upgrades and uninstallation.
 
-The exe is unsigned, so Windows may show a SmartScreen warning on first run.
-See [Install and first run](docs/GUIDE.md#install-and-first-run) for what that
-means and how to verify the download.
+At launch, Monitor Mover requests Windows administrator rights so its window-move controls can reposition Task Manager and other elevated application windows.
+
+The installer is unsigned, so Windows SmartScreen may show an unknown-publisher warning on first run. Click **More info → Run anyway**. See [Install and first run](docs/GUIDE.md#install-and-first-run) for verification details.
 
 ## Documentation
 

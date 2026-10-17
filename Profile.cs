@@ -167,16 +167,19 @@ public sealed class ProfileStore
         Converters = { new JsonStringEnumConverter() }
     };
 
+    public static string DefaultDirectory => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "MonitorMover");
+
+    public static string DefaultFilePath => Path.Combine(DefaultDirectory, "profiles.json");
+
     public string FilePath { get; }
     public List<Profile> Profiles { get; private set; } = new();
 
-    public ProfileStore()
+    public ProfileStore(string? filePath = null)
     {
-        string dir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "MonitorMover");
-        Directory.CreateDirectory(dir);
-        FilePath = Path.Combine(dir, "profiles.json");
+        FilePath = filePath ?? DefaultFilePath;
+        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
         Load();
     }
 
