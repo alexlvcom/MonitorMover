@@ -33,6 +33,17 @@ Name: startup; Description: "Start with Windows"; Flags: unchecked
 [Files]
 Source: "..\publish\installer\*"; DestDir: "{app}"; Excludes: "*.pdb"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+[InstallDelete]
+Type: files; Name: "{autoprograms}\MonitorMover.lnk"
+Type: files; Name: "{autodesktop}\MonitorMover.lnk"
+Type: files; Name: "{autostartup}\MonitorMover.lnk"
+Type: files; Name: "{userprograms}\MonitorMover.lnk"
+Type: files; Name: "{userdesktop}\MonitorMover.lnk"
+Type: files; Name: "{userstartup}\MonitorMover.lnk"
+Type: files; Name: "{commonprograms}\MonitorMover.lnk"
+Type: files; Name: "{commondesktop}\MonitorMover.lnk"
+Type: files; Name: "{commonstartup}\MonitorMover.lnk"
+
 [Icons]
 Name: "{autoprograms}\Monitor Mover"; Filename: "{app}\MonitorMover.exe"
 Name: "{autodesktop}\Monitor Mover"; Filename: "{app}\MonitorMover.exe"; Tasks: desktopicon
