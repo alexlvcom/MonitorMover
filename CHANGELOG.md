@@ -2,6 +2,10 @@
 
 All notable changes to Monitor Mover are documented in this file.
 
+## 1.2.1 - 2026-10-19
+
+- Start the update download timeout when Update is clicked. Report timeouts and allow retrying instead of leaving the download dialog stuck.
+
 ## 1.2.0 - 2026-10-17
 
 ### Main changes

@@ -29,6 +29,9 @@ and run it.
 - Automatically checks for updates on a configurable schedule (daily by default, hourly, weekly, monthly, or never).
 - Preserves all your saved profiles and settings during upgrades and uninstallation.
 
+Choose **Update** in the update offer to download and verify the installer. The
+download timeout starts on that click; a timeout shows an error and lets you retry.
+
 At launch, Monitor Mover requests Windows administrator rights so its window-move controls can reposition Task Manager and other elevated application windows.
 
 The installer is unsigned, so Windows SmartScreen may show an unknown-publisher warning on first run. Click **More info → Run anyway**. See [Install and first run](docs/GUIDE.md#install-and-first-run) for verification details.
