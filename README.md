@@ -10,6 +10,12 @@ profile once, then apply the right one when you sit down.
 
 ![Monitor Mover main window](MonitorMover.png)
 
+## Updates And What’s New
+
+Clicking **Update** checks the latest stable release again before downloading, so a prompt left open skips any superseded versions. The installer URL and SHA-256 both come from that fresh check. If the check fails, the app stops and reports the error instead of installing the old offer.
+
+After installation or an upgrade, **What’s New** shows the running version’s main changes from the bundled changelog, with **Got it** and **View full change history**. It remembers the shown version on this PC, so normal restarts stay quiet.
+
 ## Features
 
 - **Move a window** to the next monitor, the primary monitor, or a specific one.

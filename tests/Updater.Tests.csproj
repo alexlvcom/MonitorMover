@@ -20,4 +20,5 @@
     <Compile Include="../AlexLV.WindowsUi/ThemeManager.cs" Link="ThemeManager.cs" />
     <EmbeddedResource Include="../CHANGELOG.md" LogicalName="CHANGELOG.md" />
   </ItemGroup>
+  <ItemGroup><Compile Include="../Ui/WhatsNewState.cs" Link="WhatsNewState.cs" /></ItemGroup>
 </Project>

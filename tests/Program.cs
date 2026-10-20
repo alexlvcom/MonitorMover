@@ -5,6 +5,8 @@ using System.Text;
 using System.Text.Json;
 using MonitorMover;
 
+await LatestUpdateTests.RunAsync();
+ReleaseAcknowledgementTests.Run();
 var payload = Encoding.UTF8.GetBytes("test installer payload");
 var digest = Convert.ToHexString(SHA256.HashData(payload));
 const string root = "https://github.com/alexlvcom/MonitorMover/releases/download/v1.3.0/";

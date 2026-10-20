@@ -2,6 +2,13 @@
 
 All notable changes to Monitor Mover are documented in this file.
 
+## 1.3.1 - 2026-10-20
+
+### Main changes
+
+- Recheck the latest available release when Update is clicked, so an older prompt skips superseded installers. Stop if the latest release cannot be verified.
+- Show What’s New with this version’s main changes once after installation or upgrade, remembered on this PC.
+
 ## 1.3.0 - 2026-10-20
 
 ### Main changes

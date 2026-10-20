@@ -67,6 +67,7 @@ public partial class MainWindow : ThemedWindow
         _listenerWindow = new ShutdownListenerWindow(() => Dispatcher.BeginInvoke(Close));
         _listenerWindow.Show();
 
+        WhatsNewWindow.ShowForCurrentRelease(this);
         ApplyUpdateSchedule();
         if (_settings.UpdateCheckFrequency != UpdateCheckFrequency.Never) _ = CheckForUpdatesAsync(manual: false);
     }
