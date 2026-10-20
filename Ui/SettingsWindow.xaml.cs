@@ -39,7 +39,10 @@ public partial class SettingsWindow : ThemedWindow
         _onCheckForUpdates = onCheckForUpdates;
         _onInstallUpdate = onInstallUpdate;
 
-        Title = $"{AppInfo.DisplayName} Settings (v{Changelog.MarketingVersion})";
+        // The version sits at the right of the title row; clicking it opens Updates.
+        Title = $"{AppInfo.DisplayName} Settings";
+        TitleVersion = $"v{Changelog.MarketingVersion}";
+        VersionClick += (_, _) => Tabs.SelectedItem = UpdatesTab;
         Frequency.SelectedIndex = Math.Max(0, Array.IndexOf(Frequencies, UpdateSchedule.Normalize(draft.UpdateCheckFrequency)));
         (draft.Theme switch { AppTheme.Light => ThemeLight, AppTheme.Dark => ThemeDark, _ => ThemeSystem }).IsChecked = true;
         Frequency.SelectionChanged += (_, _) => OnEdited();
