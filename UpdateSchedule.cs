@@ -23,3 +23,10 @@ public static class UpdateSchedule
         _ => nowUtc.AddDays(1),
     };
 }
+
+/// <summary>Wording for update-check results, shared by the Settings status card and the Help menu message.</summary>
+internal static class UpdateMessages
+{
+    /// <summary>"You're running the latest version (v1.3.0)"; never "no newer installer".</summary>
+    internal static string Latest(string version) => $"You're running the latest version (v{version})";
+}

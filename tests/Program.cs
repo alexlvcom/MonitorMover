@@ -135,6 +135,12 @@ var nonThemed = Directory.GetFiles(Path.Combine(repo.FullName, "Ui"), "*.xaml")
     .Where(f => File.ReadAllText(f).Contains("x:Class=") && !File.ReadAllText(f).TrimStart().StartsWith("<ui:ThemedWindow"))
     .Select(Path.GetFileName).ToList();
 Check(nonThemed.Count == 0, "every window derives from ThemedWindow" + (nonThemed.Count > 0 ? ": " + string.Join(", ", nonThemed) : ""));
+Check(MonitorMover.UpdateMessages.Latest("1.3.0") == "You're running the latest version (v1.3.0)",
+    "an up-to-date check names the running version as the latest");
+var installerWording = Directory.GetFiles(repo.FullName, "*.cs", SearchOption.AllDirectories)
+    .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
+    .Where(f => File.ReadAllText(f).Contains("No newer " + "installer")).Select(Path.GetFileName).ToList();
+Check(installerWording.Count == 0, "no update result uses \"no newer installer\" wording" + (installerWording.Count > 0 ? ": " + string.Join(", ", installerWording) : ""));
 
 sealed class FakeHandler(byte[] payload, string digest, HttpStatusCode status = HttpStatusCode.OK) : HttpMessageHandler
 {

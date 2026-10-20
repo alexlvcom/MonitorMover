@@ -556,7 +556,7 @@ public partial class MainWindow : ThemedWindow
             ApplyUpdateSchedule();
             ThemeManager.Apply(_settings.Theme);
             return null;
-        }, () => CheckForUpdatesAsync(manual: true)) { Owner = this };
+        }, () => CheckForUpdatesAsync(manual: true, reportInPlace: true)) { Owner = this };
         if (initialTab != null) window.SelectTab(initialTab);
         window.ShowDialog();
     }
@@ -569,8 +569,12 @@ public partial class MainWindow : ThemedWindow
         if (_settings.UpdateCheckFrequency != UpdateCheckFrequency.Never) _updateTimer.Start();
     }
 
-    /// <summary>Checks GitHub. Manual checks report every outcome; automatic ones only offer an update.</summary>
-    private async Task<UpdateStatus> CheckForUpdatesAsync(bool manual)
+    /// <summary>
+    /// Checks GitHub. Manual checks report every outcome; automatic ones only offer an update. A check from
+    /// Settings → Updates (<paramref name="reportInPlace"/>) shows "latest version" and failures in its status
+    /// card only, so only a newer release opens a dialog.
+    /// </summary>
+    private async Task<UpdateStatus> CheckForUpdatesAsync(bool manual, bool reportInPlace = false)
     {
         var current = Changelog.MarketingVersion;
         if (_checkingUpdate) return new UpdateStatus(UpdateState.Checking, "Checking for updates…", "A check is already running");
@@ -586,11 +590,9 @@ public partial class MainWindow : ThemedWindow
 
             if (update is null)
             {
-                _lastUpdateStatus = new UpdateStatus(UpdateState.UpToDate, $"{AppInfo.DisplayName} is up to date",
-                    $"Version {current} is the latest stable version · {checkedAt}");
-                if (manual)
-                    MessageDialog.Show($"You are running version {current}.\n\nNo newer installer version is available.",
-                        MessageKind.Info, owner: ActiveOwner());
+                _lastUpdateStatus = new UpdateStatus(UpdateState.UpToDate, UpdateMessages.Latest(current), checkedAt);
+                if (manual && !reportInPlace)
+                    MessageDialog.Show(UpdateMessages.Latest(current) + ".", MessageKind.Info, owner: ActiveOwner());
                 return _lastUpdateStatus;
             }
 
@@ -609,7 +611,7 @@ public partial class MainWindow : ThemedWindow
                                       or System.Text.Json.JsonException or KeyNotFoundException or InvalidOperationException)
         {
             if (_cleanedUp) return _lastUpdateStatus;
-            if (manual)
+            if (manual && !reportInPlace)
                 MessageDialog.Show($"Could not check for updates. Please try again later.\n\n{ex.Message}",
                     MessageKind.Warning, owner: ActiveOwner());
             return new UpdateStatus(UpdateState.Failed, "Could not check for updates", $"Version {current} · {ex.Message}");

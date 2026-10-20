@@ -10,6 +10,7 @@ All notable changes to Monitor Mover are documented in this file.
 - Settings is now tabbed (General, Updates, Profiles, About, Diagnostics) and fits its window without scrolling. Help → About opens the About tab, and the paths and Copy details moved to Diagnostics.
 
 ### Other updates
+- Check for updates in Settings → Updates shows its result in the status card instead of a pop-up: "You're running the latest version (v1.3.0)" with the check time, or why the check failed. Only a newer release opens the Update dialog.
 - The main window's tables fit their columns: long titles, classes, processes and paths end with an ellipsis and show the full text in a tooltip.
 - The profiles folder field is wide enough for the full path.
 - Naming a profile shows an error under the field instead of silently doing nothing when the name is empty.
