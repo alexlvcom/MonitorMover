@@ -1,0 +1,220 @@
+<ui:ThemedWindow x:Class="MonitorMover.Ui.MainWindow"
+        xmlns:ui="clr-namespace:AlexLV.WindowsUi"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Style="{StaticResource KitWindow}"
+        Width="1180" Height="780" MinWidth="900" MinHeight="560" WindowStartupLocation="CenterScreen">
+  <DockPanel>
+    <Menu DockPanel.Dock="Top">
+      <MenuItem Header="_File">
+        <MenuItem Header="_Refresh" InputGestureText="F5" Click="Refresh_Click"/>
+        <Separator/>
+        <MenuItem Header="Open Profiles _Folder" Click="OpenProfilesFolder_Click"/>
+        <MenuItem Header="_Settings…" Click="Settings_Click"/>
+        <Separator/>
+        <MenuItem Header="E_xit" Click="Exit_Click"/>
+      </MenuItem>
+      <MenuItem Header="_Window">
+        <MenuItem Header="Move To _Next Monitor" InputGestureText="F8" Click="MoveNext_Click"/>
+        <MenuItem Header="Move To _Primary Monitor" InputGestureText="F7" Click="MovePrimary_Click"/>
+      </MenuItem>
+      <MenuItem Header="_Profiles">
+        <MenuItem Header="_Save Current Layout to Selected Profile…" Click="SaveLayout_Click"/>
+        <MenuItem Header="Save Current Layout as _New Profile…" Click="SaveLayoutAsNew_Click"/>
+        <MenuItem Header="Add _Selected Windows to Profile…" Click="AddSelected_Click"/>
+        <Separator/>
+        <MenuItem Header="_Edit Selected Profile…" Click="EditProfile_Click"/>
+        <MenuItem Header="_Apply Selected Profile" Click="ApplyProfile_Click"/>
+        <MenuItem Header="_Delete Selected Profile" Click="DeleteProfile_Click"/>
+      </MenuItem>
+      <MenuItem Header="_Help">
+        <MenuItem Header="_Check for Updates…" Click="CheckUpdates_Click"/>
+        <Separator/>
+        <MenuItem Header="_About" Click="About_Click"/>
+      </MenuItem>
+    </Menu>
+
+    <!-- Profile toolbar -->
+    <Border DockPanel.Dock="Top" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}"
+            BorderThickness="0,0,0,1" Padding="16,10">
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Click="Refresh_Click" ToolTip="Refresh (F5)">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="&#xE72C;" Style="{StaticResource ButtonGlyph}"/>
+            <TextBlock Text="Refresh"/>
+            <Border Style="{StaticResource Kbd}"><TextBlock Text="F5" FontSize="11.5" Foreground="{DynamicResource Muted}"/></Border>
+          </StackPanel>
+        </Button>
+        <StackPanel Orientation="Horizontal">
+          <TextBlock Text="Profile" Style="{StaticResource MutedText}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+          <ComboBox x:Name="ProfileCombo" Width="220" Margin="0,0,12,0"/>
+          <Button Style="{StaticResource PrimaryButton}" Click="ApplyProfile_Click">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="&#xE768;" Style="{StaticResource ButtonGlyph}"/>
+              <TextBlock Text="Apply"/>
+            </StackPanel>
+          </Button>
+          <Button Margin="8,0,0,0" Click="SaveLayout_Click">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="&#xE74E;" Style="{StaticResource ButtonGlyph}"/>
+              <TextBlock Text="Save Current Layout…"/>
+            </StackPanel>
+          </Button>
+          <Button Margin="8,0,0,0" Click="EditProfile_Click">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="&#xE70F;" Style="{StaticResource ButtonGlyph}"/>
+              <TextBlock Text="Edit…"/>
+            </StackPanel>
+          </Button>
+          <Button Margin="8,0,0,0" Click="DeleteProfile_Click">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="&#xE74D;" Style="{StaticResource ButtonGlyph}" Foreground="{DynamicResource Danger}"/>
+              <TextBlock Text="Delete…"/>
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- Status bar -->
+    <Border DockPanel.Dock="Bottom" Background="{DynamicResource Chrome}" BorderBrush="{DynamicResource Border}"
+            BorderThickness="0,1,0,0" Padding="16,6">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+          <TextBlock x:Name="SelectionText" Style="{StaticResource MutedText}" FontSize="12.5" VerticalAlignment="Center" Margin="0,0,18,0"/>
+          <TextBlock Text="Move:" Style="{StaticResource MutedText}" FontSize="12.5" VerticalAlignment="Center"/>
+          <Border Style="{StaticResource Kbd}"><TextBlock Text="F8" FontSize="11.5" Foreground="{DynamicResource Muted}"/></Border>
+          <TextBlock Text=" next ·" Style="{StaticResource MutedText}" FontSize="12.5" VerticalAlignment="Center"/>
+          <Border Style="{StaticResource Kbd}"><TextBlock Text="F7" FontSize="11.5" Foreground="{DynamicResource Muted}"/></Border>
+          <TextBlock Text=" primary" Style="{StaticResource MutedText}" FontSize="12.5" VerticalAlignment="Center"/>
+        </StackPanel>
+        <TextBlock x:Name="StatusText" Text="Ready" FontSize="12.5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+      </DockPanel>
+    </Border>
+
+    <Grid Margin="16,12,16,12">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="16"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="*"/>
+      </Grid.RowDefinitions>
+
+      <!-- Monitors -->
+      <DockPanel Grid.Row="0" Margin="0,0,0,8">
+        <TextBlock x:Name="MonitorCount" DockPanel.Dock="Right" Style="{StaticResource MutedText}" FontSize="12.5" VerticalAlignment="Center"/>
+        <TextBlock Text="Monitors" Style="{StaticResource StrongText}" VerticalAlignment="Center"/>
+        <TextBlock Text="Click one to filter the window list below" Style="{StaticResource MutedText}" FontSize="12.5"
+                   VerticalAlignment="Center" Margin="12,0,0,0"/>
+      </DockPanel>
+      <DataGrid Grid.Row="1" x:Name="MonitorsGrid" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single"
+                CanUserAddRows="False" CanUserDeleteRows="False" CanUserResizeRows="False" CanUserReorderColumns="False"
+                BorderThickness="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                SelectionChanged="MonitorsGrid_SelectionChanged">
+        <DataGrid.ContextMenu>
+          <ContextMenu>
+            <MenuItem Header="Show Windows On This Monitor" Click="ShowMonitorWindows_Click"/>
+            <MenuItem Header="Show Windows On All Monitors" Click="ShowAllWindows_Click"/>
+          </ContextMenu>
+        </DataGrid.ContextMenu>
+        <DataGrid.Columns>
+          <DataGridTemplateColumn Header="Monitor" Width="88">
+            <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Monitor}" FontWeight="SemiBold" Style="{StaticResource CellText}"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="Resolution" Width="128">
+            <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Resolution}" Style="{StaticResource CellText}"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="Left-Top" Width="104">
+            <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding LeftTop}" Style="{StaticResource CellText}"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="Right-Bottom" Width="116">
+            <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding RightBottom}" Style="{StaticResource CellText}"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="Primary" Width="92">
+            <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Primary}" Style="{StaticResource CellText}"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="Work Area" Width="200">
+            <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding WorkArea}" Style="{StaticResource CellText}"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="Colors" Width="80">
+            <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Colors}" Style="{StaticResource CellText}"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="Device Name" Width="*" MinWidth="120">
+            <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Device}" Style="{StaticResource MonoCellText}"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+        </DataGrid.Columns>
+      </DataGrid>
+
+      <!-- Windows -->
+      <DockPanel Grid.Row="3" Margin="0,0,0,8">
+        <TextBlock x:Name="WindowCount" DockPanel.Dock="Right" Style="{StaticResource MutedText}" FontSize="12.5" VerticalAlignment="Center"/>
+        <TextBlock Text="Windows" Style="{StaticResource StrongText}" VerticalAlignment="Center"/>
+        <Border Style="{StaticResource Chip}" Margin="12,0,0,0">
+          <TextBlock x:Name="ScopeText" Style="{StaticResource MutedText}" FontSize="12.5"/>
+        </Border>
+        <Grid Width="320" Margin="14,0,0,0" HorizontalAlignment="Left">
+          <TextBox x:Name="FilterBox" Padding="28,5,8,5" VerticalContentAlignment="Center"
+                   ToolTip="Filter apps by window title or process name. Esc clears." KeyDown="FilterBox_KeyDown"
+                   TextChanged="FilterBox_TextChanged"/>
+          <TextBlock Text="&#xE721;" FontFamily="{DynamicResource IconFont}" FontSize="13" Foreground="{DynamicResource Muted}"
+                     Margin="11,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left" IsHitTestVisible="False"/>
+          <TextBlock x:Name="FilterPlaceholder" Text="Filter apps: type part of a window or app name…" Style="{StaticResource MutedText}"
+                     FontSize="13" Margin="31,0,8,0" VerticalAlignment="Center" IsHitTestVisible="False"
+                     TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+        </Grid>
+      </DockPanel>
+      <DataGrid Grid.Row="4" x:Name="WindowsGrid" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Extended"
+                SelectionUnit="FullRow" CanUserAddRows="False" CanUserDeleteRows="False" CanUserResizeRows="False"
+                CanUserReorderColumns="False" BorderThickness="1" HorizontalScrollBarVisibility="Disabled"
+                VerticalScrollBarVisibility="Auto" IsTextSearchEnabled="False"
+                SelectionChanged="WindowsGrid_SelectionChanged" PreviewTextInput="WindowsGrid_PreviewTextInput"
+                PreviewMouseRightButtonDown="WindowsGrid_PreviewMouseRightButtonDown">
+        <DataGrid.ContextMenu>
+          <ContextMenu Opened="WindowsMenu_Opened">
+            <MenuItem Header="Move To Next Monitor" InputGestureText="F8" Click="MoveNext_Click"/>
+            <MenuItem Header="Move To Primary Monitor" InputGestureText="F7" Click="MovePrimary_Click"/>
+            <MenuItem x:Name="MoveToMonitorMenu" Header="Move To Monitor"/>
+            <Separator/>
+            <MenuItem Header="Add Selected to Profile…" Click="AddSelected_Click"/>
+            <MenuItem Header="Bring To Front" Click="BringToFront_Click"/>
+          </ContextMenu>
+        </DataGrid.ContextMenu>
+        <DataGrid.Columns>
+          <DataGridTemplateColumn Header="Title" Width="2.4*" MinWidth="180">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate>
+                <DockPanel>
+                  <Image DockPanel.Dock="Left" Source="{Binding Icon}" Width="16" Height="16" Margin="10,0,0,0"
+                         RenderOptions.BitmapScalingMode="HighQuality"/>
+                  <TextBlock Text="{Binding Title}" Style="{StaticResource CellText}" Margin="8,0,10,0"/>
+                </DockPanel>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="Monitor" Width="80">
+            <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Monitor}" Style="{StaticResource CellText}"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="Left-Top" Width="104">
+            <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding LeftTop}" Style="{StaticResource CellText}"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="Size" Width="108">
+            <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Size}" Style="{StaticResource CellText}"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="State" Width="100">
+            <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding State}" Style="{StaticResource CellText}"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="Class" Width="1.1*" MinWidth="90">
+            <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Class}" Style="{StaticResource CellText}"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="Process" Width="1*" MinWidth="90">
+            <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Process}" Style="{StaticResource CellText}"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="Path" Width="1.7*" MinWidth="120">
+            <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Path}" Style="{StaticResource CellText}"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+        </DataGrid.Columns>
+      </DataGrid>
+    </Grid>
+  </DockPanel>
+</ui:ThemedWindow>

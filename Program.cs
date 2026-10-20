@@ -1,4 +1,6 @@
-using System.Windows.Forms;
+using System.Windows;
+using AlexLV.WindowsUi;
+using MonitorMover.Ui;
 
 namespace MonitorMover;
 
@@ -7,28 +9,43 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        // Sets per-monitor (v2) DPI awareness before any window, so window coordinates are physical
+        // pixels for both WPF and the Win32 window-moving code (app.manifest declares the same).
         ApplicationConfiguration.Initialize();
+
+        var settings = AppSettings.Load();
+        ThemeManager.Initialize(AppInfo.DisplayName, AppInfo.Accent, settings.Theme);
+        var app = Application.Current!;
+        app.Resources.MergedDictionaries.Add(new ResourceDictionary
+        {
+            Source = new Uri("/MonitorMover;component/Ui/AppStyles.xaml", UriKind.Relative),
+        });
+        if (AppIcon.Default is { } icon) ThemeManager.WindowIcon = WinFormsHosting.ToImageSource(icon);
+        app.DispatcherUnhandledException += (_, e) =>
+        {
+            ErrorLog.Write("Unhandled UI exception.", e.Exception);
+            MessageDialog.Show($"Something went wrong and Monitor Mover could not finish that action.\n\n{e.Exception.Message}\n\n" +
+                               $"Details were written to {ErrorLog.FilePath}.", MessageKind.Error);
+            e.Handled = true;
+        };
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            ErrorLog.Write("Unhandled exception.", e.ExceptionObject as Exception);
 
         // Headless CLI mode: apply a profile without showing the UI.
         //   MonitorMover.exe --apply "Office"
         //   MonitorMover.exe --list
-        if (args.Length > 0)
-        {
-            if (RunCli(args)) return;
-        }
+        if (args.Length > 0 && RunCli(args)) return;
 
         using var mutex = new Mutex(initiallyOwned: true, name: "MonitorMover.Singleton", createdNew: out var createdNew);
         if (!createdNew)
         {
-            var hwnd = NativeMethods.FindWindow(null, $"Monitor Mover (v{Changelog.MarketingVersion})");
-            if (hwnd != IntPtr.Zero)
-            {
-                NativeMethods.SetForegroundWindow(hwnd);
-            }
+            var hwnd = NativeMethods.FindWindow(null, AppInfo.MainWindowTitle);
+            if (hwnd != IntPtr.Zero) NativeMethods.SetForegroundWindow(hwnd);
             return;
         }
 
-        Application.Run(new MainForm());
+        app.ShutdownMode = ShutdownMode.OnMainWindowClose;
+        app.Run(new MainWindow(settings));
     }
 
     /// <summary>Returns true if a CLI command was handled (so the GUI should not start).</summary>
@@ -43,39 +60,35 @@ internal static class Program
                 var names = store.Profiles.Count == 0
                     ? "(no profiles saved)"
                     : string.Join(Environment.NewLine, store.Profiles.Select(p => $"  {p.Name}  ({p.Rules.Count} rules)"));
-                MessageBox.Show("Saved profiles:\n\n" + names, "Monitor Mover", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageDialog.Show("Saved profiles:\n\n" + names, MessageKind.Info);
                 return true;
 
             case "--apply":
             case "-a":
                 if (args.Length < 2)
                 {
-                    MessageBox.Show("Usage: MonitorMover.exe --apply \"ProfileName\"", "Monitor Mover",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageDialog.Show("Usage: MonitorMover.exe --apply \"ProfileName\"", MessageKind.Warning);
                     return true;
                 }
                 var profile = store.Find(args[1]);
                 if (profile == null)
                 {
-                    MessageBox.Show($"Profile \"{args[1]}\" not found.", "Monitor Mover",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageDialog.Show($"Profile \"{args[1]}\" not found.", MessageKind.Error);
                     return true;
                 }
                 var windows = WindowManager.GetWindows();
                 var monitors = WindowManager.GetMonitors();
                 var log = ProfileStore.Apply(profile, windows, monitors);
-                int ok = log.Count(l => l.StartsWith("OK"));
+                var ok = log.Count(l => l.StartsWith("OK"));
                 // Silent success unless something was skipped/failed.
-                if (ok < log.Count)
-                    ResultViewer.Show($"Apply Profile — {profile.Name}", log);
+                if (ok < log.Count) LogWindow.Show(null, $"Apply Profile — {profile.Name}", log);
                 return true;
 
             case "--capture":
             case "-c":
                 if (args.Length < 2)
                 {
-                    MessageBox.Show("Usage: MonitorMover.exe --capture \"ProfileName\"", "Monitor Mover",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageDialog.Show("Usage: MonitorMover.exe --capture \"ProfileName\"", MessageKind.Warning);
                     return true;
                 }
                 var capMon = WindowManager.GetMonitors();
@@ -107,7 +120,7 @@ internal static class Program
                     mtSb.AppendLine($"        bounds={match.Bounds}");
                     mtSb.AppendLine($"MOVE  -> next monitor #{next.Index + 1} ({next.DeviceName})");
                     WindowManager.MoveToMonitorKeepRelative(match, next, mtMons);
-                    System.Threading.Thread.Sleep(500);
+                    Thread.Sleep(500);
                     var after = WindowManager.GetWindows().FirstOrDefault(w => w.Handle == match.Handle);
                     if (after != null)
                     {

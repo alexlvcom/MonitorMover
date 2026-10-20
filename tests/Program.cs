@@ -1,4 +1,5 @@
 using System.Net;
+using AlexLV.WindowsUi;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -84,6 +85,56 @@ try
     catch (UnauthorizedAccessException) { Console.WriteLine("PASS: settings save failure reported to caller"); }
 }
 finally { if (Directory.Exists(settingsRoot)) Directory.Delete(settingsRoot, true); }
+
+// Theme setting.
+Check(new AppSettings().Theme == AppTheme.System, "theme follows Windows by default");
+Check(ThemeManager.Resolve(AppTheme.System, systemUsesLight: true) == false, "System resolves to light when Windows is light");
+Check(ThemeManager.Resolve(AppTheme.System, systemUsesLight: false), "System resolves to dark when Windows is dark");
+Check(!ThemeManager.Resolve(AppTheme.Light, systemUsesLight: false) && ThemeManager.Resolve(AppTheme.Dark, systemUsesLight: true),
+    "Light and Dark ignore the Windows mode");
+var themeRoot = Path.Combine(Path.GetTempPath(), "MonitorMoverThemeTest-" + Guid.NewGuid().ToString("N"));
+try
+{
+    var themePath = Path.Combine(themeRoot, "settings.json");
+    new AppSettings { Theme = AppTheme.Dark, UpdateCheckFrequency = UpdateCheckFrequency.Weekly }.Save(themePath);
+    var loaded = AppSettings.Load(themePath);
+    Check(loaded.Theme == AppTheme.Dark && loaded.UpdateCheckFrequency == UpdateCheckFrequency.Weekly, "theme survives a save and load");
+    File.WriteAllText(themePath, "{ \"Theme\": 42 }");
+    Check(AppSettings.Load(themePath).Theme == AppTheme.System, "unknown saved theme falls back to System");
+    File.WriteAllText(themePath, "{ \"UpdateCheckFrequency\": 1 }");
+    Check(AppSettings.Load(themePath).Theme == AppTheme.System, "settings from 1.2.x without a theme load as System");
+}
+finally { if (Directory.Exists(themeRoot)) Directory.Delete(themeRoot, true); }
+var running = new AppSettings { Theme = AppTheme.Light };
+var draft = running.Clone();
+draft.Theme = AppTheme.Dark;
+draft.UpdateCheckFrequency = UpdateCheckFrequency.Never;
+Check(running.Theme == AppTheme.Light && running.UpdateCheckFrequency == UpdateCheckFrequency.Daily, "a Settings draft leaves the running settings unchanged");
+
+// One version source: the project file, matched by the newest changelog heading.
+var repo = new DirectoryInfo(AppContext.BaseDirectory);
+while (repo is not null && !File.Exists(Path.Combine(repo.FullName, "MonitorMover.csproj"))) repo = repo.Parent;
+Check(repo is not null, "repository root found");
+var project = File.ReadAllText(Path.Combine(repo!.FullName, "MonitorMover.csproj"));
+var projectVersion = System.Text.RegularExpressions.Regex.Match(project, @"<Version>([^<]+)</Version>").Groups[1].Value;
+var entries = Changelog.Parse(File.ReadAllText(Path.Combine(repo.FullName, "CHANGELOG.md")));
+Check(entries.Length > 0 && entries[0].Version == projectVersion, $"newest changelog heading matches the project version {projectVersion}");
+Check(entries[0].Sections.Count > 0 && entries[0].Sections[0].Heading == "Main changes", "release notes lead with Main changes");
+Check(project.Contains($"<InformationalVersion>{projectVersion}</InformationalVersion>") &&
+      project.Contains($"<FileVersion>{projectVersion}.0</FileVersion>") &&
+      project.Contains($"<AssemblyVersion>{projectVersion}.0</AssemblyVersion>"), "project version fields agree");
+Check(Changelog.Entries.Length == entries.Length, "embedded changelog is the repository changelog");
+var parsed = Changelog.Parse("## 2.0.0 - 2026-01-02\n\n### Main changes\n- First\n  continued\n\n### Other updates\n- Second\n\n## 1.9.0 - 2026-01-01\n- Old\n");
+Check(parsed.Length == 2 && parsed[0].Notes.SequenceEqual(new[] { "First continued", "Second" }) && parsed[1].Notes.Single() == "Old",
+    "changelog parser reads sections, wrapped bullets and older releases");
+
+// WPF needs culture data, and every window must open already themed.
+Check(!project.Contains("<InvariantGlobalization>true</InvariantGlobalization>"),
+    "the app keeps culture data for WPF text layout (invariant mode crashed TextBox layout)");
+var nonThemed = Directory.GetFiles(Path.Combine(repo.FullName, "Ui"), "*.xaml")
+    .Where(f => File.ReadAllText(f).Contains("x:Class=") && !File.ReadAllText(f).TrimStart().StartsWith("<ui:ThemedWindow"))
+    .Select(Path.GetFileName).ToList();
+Check(nonThemed.Count == 0, "every window derives from ThemedWindow" + (nonThemed.Count > 0 ? ": " + string.Join(", ", nonThemed) : ""));
 
 sealed class FakeHandler(byte[] payload, string digest, HttpStatusCode status = HttpStatusCode.OK) : HttpMessageHandler
 {

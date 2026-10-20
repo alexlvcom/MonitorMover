@@ -3,6 +3,9 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
+    <!-- Every window is WPF with the shared AlexLV.WindowsUi kit (see AlexLV.WindowsUi in the
+         kit's canonical copy). WinForms stays for Screen enumeration and System.Drawing geometry. -->
+    <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -14,15 +17,27 @@
     <ApplicationIcon>MonitorMover.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <Product>Monitor Mover</Product>
-    <Version>1.2.2</Version>
-    <InformationalVersion>1.2.2</InformationalVersion>
-    <FileVersion>1.2.2.0</FileVersion>
-    <AssemblyVersion>1.2.2.0</AssemblyVersion>
+    <Version>1.3.0</Version>
+    <InformationalVersion>1.3.0</InformationalVersion>
+    <FileVersion>1.3.0.0</FileVersion>
+    <AssemblyVersion>1.3.0.0</AssemblyVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- WinForms and WPF share type names (Button, TextBox, Application); files opt in to
+         WinForms or System.Drawing explicitly instead of through implicit usings. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+    <!-- UseWPF drops these to avoid System.Windows.Shapes.Path. -->
+    <Using Include="System.IO" />
+    <Using Include="System.Net.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Remove="tests/**/*.cs" />
+    <None Remove="tests/**" />
+    <Page Remove="tests/**" />
     <!-- Same file again as a managed resource, so the windows can use it at runtime. -->
     <EmbeddedResource Include="MonitorMover.ico" LogicalName="MonitorMover.ico" />
     <EmbeddedResource Include="CHANGELOG.md" LogicalName="CHANGELOG.md" />

@@ -2,6 +2,21 @@
 
 All notable changes to Monitor Mover are documented in this file.
 
+## 1.3.0 - 2026-10-20
+
+### Main changes
+- Redesigned every Monitor Mover window, dialog and menu with the modern look shared by all AlexLV Windows apps: flat cards and tables, toggle switches, the monitor blue from the icon as the accent, and themed title bars.
+- Added Settings → General → Theme with System (default), Light and Dark. System follows the Windows light or dark mode and switches live when Windows changes; a new choice previews at once and Cancel restores the saved theme.
+- Settings is now tabbed (General, Updates, Profiles, About, Diagnostics) and fits its window without scrolling. Help → About opens the About tab, and the paths and Copy details moved to Diagnostics.
+
+### Other updates
+- The main window's tables fit their columns: long titles, classes, processes and paths end with an ellipsis and show the full text in a tooltip.
+- The profiles folder field is wide enough for the full path.
+- Naming a profile shows an error under the field instead of silently doing nothing when the name is empty.
+- The Apply Profile log wraps long lines, and the change history shows each release's notes as sections.
+- Windows open already themed instead of flashing light first.
+- Unexpected errors are written to errors.log next to the settings.
+
 ## 1.2.2 - 2026-10-20
 
 ### Main changes

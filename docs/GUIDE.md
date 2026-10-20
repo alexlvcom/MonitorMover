@@ -17,7 +17,17 @@ The installer installs Monitor Mover into `%LOCALAPPDATA%\Programs\Monitor Mover
 
 ### Updates
 
-Monitor Mover includes automatic update checking against GitHub releases. In **File → Settings…**, you can configure how frequently the app checks for updates (hourly, daily, weekly, monthly, or never), or trigger a manual check anytime via **File → Settings…**, **Help → Check for Updates…**, or in the **About** window. Updates verify the SHA-256 hash before running the installer.
+Monitor Mover includes automatic update checking against GitHub releases. In **File → Settings… → Updates**, you can configure how frequently the app checks for updates (hourly, daily, weekly, monthly, or never), or trigger a manual check anytime with **Check for updates** there or **Help → Check for Updates…**. Updates verify the SHA-256 hash before running the installer.
+
+### Settings
+
+**File → Settings…** has five tabs. Nothing changes until you click **Save**; **Cancel**, Esc or closing the window discards your edits. If the settings file cannot be written, an error appears and the window stays open with your changes.
+
+- **General** — **Theme**: System (default) follows the Windows light or dark mode and switches when Windows does; Light and Dark override it. A new theme previews at once and is kept only when you save.
+- **Updates** — the check schedule, **Check for updates**, and the result of the last check.
+- **Profiles** — the profiles folder, with **Open folder**.
+- **About** — the version, build and release notes. **Help → About** opens this tab.
+- **Diagnostics** — the executable, profiles and settings paths with **Open**, and **Copy details** for a bug report.
 
 ### Windows SmartScreen
 
@@ -136,9 +146,10 @@ and counts them.
 
 Top panel = monitors, bottom panel = windows.
 
-- **Find an app by keyword:** type into the **Filter apps** box to narrow the list
-  to windows whose title or process name contains what you typed. Clear the box to
-  show everything again.
+- **Find an app by keyword:** type into the **Filter apps** box, or just start typing
+  over the window list, to narrow it to windows whose title or process name contains
+  what you typed. Esc clears the filter. Long titles and paths end with "…"; hover a
+  cell to read it in full.
 - **Filter by monitor:** click a monitor in the top pane to show only that
   monitor's windows below; right-click a monitor → *Show Windows On All Monitors*
   to clear the filter.
@@ -175,7 +186,8 @@ when you sit down.
 ## Where your data lives
 
 - `%APPDATA%\MonitorMover\profiles.json` — saved profiles (human-readable JSON; edit or back it up freely).
-- `%APPDATA%\MonitorMover\settings.json` — application settings including update check schedule.
+- `%APPDATA%\MonitorMover\settings.json` — application settings: the update check schedule and the theme.
+- `%APPDATA%\MonitorMover\errors.log` — written only if something unexpected goes wrong; include it in a bug report.
 
 *File → Open Profiles Folder* jumps there.
 

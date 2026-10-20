@@ -18,7 +18,7 @@
 - Setup and uninstall close the app through `WM_CLOSE` on `MonitorMoverListener`, then wait for the `MonitorMover.Singleton` mutex to be released. Keep this wired to the same clean exit as the file menu. Setup uses `PrepareToInstall` and restarts a previously running app after upgrade. Do not add an `AppMutex` directive that prompts before automatic shutdown.
 - Preserve existing startup shortcuts by selecting the installer's `startup` task ("Start with Windows") when one already exists. Shortcuts must target the installed EXE.
 - Keep user profiles and settings in `%APPDATA%\MonitorMover`; upgrades and uninstall must preserve them.
-- About must show the actual running EXE path from `Application.ExecutablePath`, not a hard-coded installation path.
+- Diagnostics must show the actual running EXE path from `Environment.ProcessPath`, not a hard-coded installation path.
 
 ## Elevated application repositioning
 
@@ -31,10 +31,25 @@
 - Keep background failures quiet. Manual Check for updates lives in Settings and Help menu, reporting results to the user. Later suppresses that version for the current session; manual checks may offer it again.
 - Run updater tests with `dotnet run --project tests/Updater.Tests.csproj -c Release`.
 
-## About window layout
+## UI and themes
 
-- Show the app icon before the app name. Keep the EXE path, profiles path, and settings path selectable for copying, but focus Close initially so diagnostic paths and release notes are not preselected.
-- Include a "Copy details" button to copy diagnostic paths and release notes to the clipboard without requiring manual selection.
+- Every window and dialog is WPF styled by the shared AlexLV Windows UI kit, vendored in `AlexLV.WindowsUi/`. The canonical copy is `C:\projects\AlexLV.WindowsUi` (see its README); change it there and copy it to every app, never edit the vendored copy. Tray Keeper is the kit's reference implementation.
+- Every window derives from `ThemedWindow` (XAML root `ui:ThemedWindow`) so it never flashes light; use `MessageDialog`, never `MessageBox`. Do not set `InvariantGlobalization` to true: WPF text layout needs culture data. Tests guard both.
+- `Ui/AppStyles.xaml` holds the menu bar, submenu, separator and data grid row/cell styles the kit does not cover yet. Fold them into the kit when another app needs them.
+- The approved design is `design/ui-redesign.html`; update it before a visible redesign. Accent: `#1F5FBF` light, `#7AAAF2` dark (the icon's monitor blue). Surfaces stay neutral.
+- Settings → General → Theme offers System (default), Light and Dark. System follows the Windows app mode live. A new theme previews at once; any close without Save restores the saved theme.
+- Settings tabs (General, Updates, Profiles, About, Diagnostics) fit the fixed 720×620 window without vertical scrolling; move overflowing content to another tab. Help → About opens the About tab.
+- Version and release notes come only from the assembly version and the embedded `CHANGELOG.md`; no version is hand-maintained in code.
+- The main window keeps per-monitor (v2) DPI awareness (`app.manifest` and `ApplicationConfiguration.Initialize`) so window coordinates stay physical pixels for `WindowManager`.
+
+## Shutdown listener
+
+- `ShutdownListenerWindow` must create its handle explicitly (its `SetVisibleCore` keeps it hidden, so `Show()` alone creates nothing and setup finds no window) and must allow `WM_CLOSE` through UIPI with `ChangeWindowMessageFilterEx`, because the elevated app is closed by unelevated setup.
+
+## About and Diagnostics layout
+
+- About shows the app icon before the app name, the build, and "Release notes for vN.N.N" from `CHANGELOG.md`. Focus Save initially so release notes are not preselected.
+- Diagnostics shows the EXE path (from `Environment.ProcessPath`), profiles path and settings path selectable for copying, each with Open, plus "Copy details" to copy them and the release notes to the clipboard.
 
 ## Automated release identity
 

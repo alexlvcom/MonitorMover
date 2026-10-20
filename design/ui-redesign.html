@@ -1,0 +1,1318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monitor Mover UI Redesign</title>
+<!--
+  Monitor Mover v1.2.2 — interactive redesign mockup (owner approval before any app change).
+  Preview only: every action is simulated in the browser; nothing touches real windows or files.
+
+  UI INVENTORY (from source, C:\projects\MonitorMover):
+  Main window  "Monitor Mover (v1.2.2)"  (MainForm.cs)
+    Menu  File: Refresh F5 | Open Profiles Folder | Settings… | Exit
+          Window: Move To Next Monitor F8 | Move To Primary Monitor F7
+          Profiles: Save Current Layout to Selected Profile… | Save Current Layout as New Profile… |
+                    Add Selected Windows to Profile… | Edit Selected Profile… | Apply Selected Profile | Delete Selected Profile
+          Help: Check for Updates… | About
+    Profile bar  "Profile:" [combo 220px] Apply | Save Current Layout… | Edit… | Delete… | Refresh (F5)
+    Monitors list header "Monitors  (click one to filter the window list below)"
+      columns Monitor, Resolution, Left-Top, Right-Bottom, Primary, Work Area, Colors, Device Name
+      context menu: Show Windows On This Monitor | Show Windows On All Monitors
+    Windows panel  "Filter apps:" [placeholder "type part of a window/app name…"] + header
+      "Windows — {scope}{filter}  (shown/total)"; typing over the list goes to the filter; Esc clears
+      columns Title (with app icon), Monitor, Left-Top, Size, State, Class, Process, Path
+      context menu: Move To Next Monitor (F8) | Move To Primary Monitor (F7) | Move To Monitor ▸ Monitor #n (WxH) |
+                    Add Selected to Profile… | Bring To Front
+    Status bar "Ready" + action results ("Moved 1 window(s) to next monitor.", "Select a window first.", …)
+  Prompt dialogs (Dialogs.cs Prompt.Text): "Save Layout" — "Name this new profile (e.g. Home, Office):" default Office;
+      "Add to Profile" — "Add selected windows to which profile? (new or existing name):"   OK / Cancel
+  Confirm boxes: "Profile "X" exists. Overwrite?" Yes/No;  "Delete profile "X"?" Yes/No (warning)
+  Edit Profile (ProfileEditorForm.cs) 980×560 new capture / 980×760 with saved baseline
+      "Profile name:" box; hint "One row per application: every open window of that .exe is sent to its target monitor.
+      Fill in "Title Contains" only to give one particular window a target of its own."
+      grid On | Process | Captured Title | Title Contains (optional) | Target Monitor | State (Normal/Maximized/Minimized) | Pos / Size
+      diff banner: "N CHANGE(S) TO SAVE vs the saved profile "X"" (amber) or "NO CHANGES TO SAVE — this layout already matches…" (blue)
+      diff grid Change(+ added/− removed/~ changed/= kept) | Application | Monitor | State | Position | Size | Note;
+      "Show unchanged apps"; empty note; Remove Selected Rows | Save ("Nothing to Save" disabled) | Cancel
+  Apply result viewer (ResultViewer): "Apply Profile — X" monospace log OK/SKIP/FAIL lines, Close
+  Change history viewer: "Monitor Mover Change History", Close
+  Settings "Monitor Mover Settings (v1.2.2)" (SettingsForm.cs): Updates group — "Check for updates:" Once an hour |
+      Once a day (default) | Once a week | Once a month | Never (tooltip "Check at startup, then at this interval. Never
+      disables automatic checks."), Check for updates button, note; Profiles group — "Profiles folder:" (240px, too narrow)
+      + Open folder; Save / Cancel; errors "Could not save settings to: …", "Could not open the profiles folder."
+  About "About Monitor Mover (v1.2.2)" (AboutForm.cs): icon, "Monitor Mover  v1.2.2", "Build 1.2.2 · built …",
+      link alexlvcom · github; Executable / Profiles file / Settings file; "Release notes for v1.2.2:" + View full change
+      history; Copy details ("Application details copied to clipboard."), Check for updates, Close
+  Update flow (MainForm.cs): up-to-date box "You are running version 1.2.2. No newer installer version is available.";
+      failure "Could not check for updates. Please try again later."; dialog "Update Monitor Mover (v1.2.2)" Update / Later;
+      "Downloading and verifying the installer…"; timeout "The download timed out. Check your connection and click Update
+      to try again."; failure "Update failed. Please try again."
+  Command-line boxes (Program.cs): --list "Saved profiles:"; --apply/--capture usage; "Profile "X" not found."
+
+  REDESIGN DECISIONS: Settings becomes tabbed (General, Updates, Profiles, About); per the shared standard a tabbed
+  Settings integrates About as a tab, so Help → About opens Settings on About. Appearance theme System/Light/Dark is
+  new (draft: previews live, Save keeps it, Cancel reverts). Profiles folder field widened to ≥460px.
+-->
+<style>
+:root {
+  color-scheme: light dark;
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --radius: 5px;
+  --radius-lg: 8px;
+  /* Per-app identity: override these two in each mockup. */
+  --accent-light: #005fb8;   /* must give >= 4.5:1 on --surface (light) */
+  --accent-dark:  #60a5fa;   /* neutral default accent; >= 3:1 focus on dark canvas */
+}
+/* Light */
+:root, :root[data-theme="light"] {
+  --surface: #f5f5f5;   /* window canvas */
+  --chrome:  #ebebeb;   /* title row / nav / footer */
+  --raised:  #ffffff;   /* cards, inputs */
+  --border:  #d6d6d6;
+  --text:    #1b1b1b;
+  --muted:   #5f5f5f;
+  --accent:  var(--accent-light);
+  --on-accent: #ffffff;
+  --selection: color-mix(in srgb, var(--accent) 14%, transparent);
+  --danger: #b3261e;
+  --ok: #2e7d32;
+}
+/* Dark (neutral) */
+:root[data-theme="dark"] {
+  --surface: #1c1c1c;
+  --chrome:  #262626;
+  --raised:  #2d2d2d;
+  --border:  #3d3d3d;
+  --text:    #f0f0f0;
+  --muted:   #a6a6a6;
+  --accent:  var(--accent-dark);
+  --on-accent: #111111;
+  --selection: color-mix(in srgb, var(--accent) 18%, transparent);
+  --danger: #f2a198;
+  --ok: #9fd39f;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface: #1c1c1c; --chrome: #262626; --raised: #2d2d2d; --border: #3d3d3d;
+    --text: #f0f0f0; --muted: #a6a6a6; --accent: var(--accent-dark); --on-accent: #111111;
+    --selection: color-mix(in srgb, var(--accent) 18%, transparent);
+    --danger: #f2a198; --ok: #9fd39f;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #6b6a66; font: 14px/1.45 var(--font); }
+body { display: grid; place-items: center; min-height: 100vh; padding: 32px 16px; }
+
+/* Mockup harness bar (not part of the app) */
+.harness { position: fixed; top: 0; left: 0; right: 0; display: flex; gap: 12px; align-items: center;
+  padding: 6px 16px; background: #111; color: #ddd; font-size: 12px; z-index: 10; }
+.harness b { color: #fff; }
+
+/* Native-sized window: 720px wide like the standard requires */
+.window { width: 720px; max-width: 100%; background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden;
+  box-shadow: 0 18px 48px rgba(0,0,0,.35); display: flex; flex-direction: column; min-height: 560px; }
+
+/* One title row: icon, title (vN.N.N), section tabs, window controls */
+.titlebar { display: flex; align-items: center; gap: 10px; background: var(--chrome);
+  padding: 0 0 0 14px; height: 44px; border-bottom: 1px solid var(--border); user-select: none; }
+.titlebar .app-icon { width: 18px; height: 18px; border-radius: 4px; flex: none; }
+.titlebar .title { font-weight: 600; white-space: nowrap; }
+.titlebar .title small { color: var(--muted); font-weight: 400; }
+.winctl { margin-left: auto; display: flex; height: 100%; }
+.winctl span { width: 46px; display: grid; place-items: center; color: var(--muted); }
+.winctl span:last-child:hover { background: #c42b1c; color: #fff; }
+
+.tabs { display: flex; gap: 2px; padding: 0 16px; background: var(--chrome); border-bottom: 1px solid var(--border); }
+.tab { appearance: none; border: 0; background: none; color: var(--muted); font: inherit;
+  padding: 10px 12px 9px; border-bottom: 2px solid transparent; cursor: pointer; border-radius: 0; }
+.tab:hover { color: var(--text); }
+.tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+
+.page { padding: 22px 24px; flex: 1; display: none; }
+.page.active { display: block; }
+.page h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+  margin: 0 0 10px; font-weight: 600; }
+.section + .section { margin-top: 20px; }
+
+.card { background: var(--raised); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.row { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 10px 16px; }
+.row + .row { border-top: 1px solid var(--border); }
+.row .label { flex: 1; min-width: 0; }
+.row .label span { display: block; color: var(--muted); font-size: 12.5px; }
+
+input[type="text"], input[type="number"], select, textarea {
+  font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 6px 10px; min-height: 32px; }
+input[type="number"] { width: 76px; }
+.path { width: 100%; min-width: 460px; font-family: "Cascadia Mono", Consolas, monospace; font-size: 12.5px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+button.btn { font: inherit; color: var(--text); background: var(--raised); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 6px 14px; min-height: 32px; cursor: pointer; white-space: nowrap; }
+button.btn:hover { border-color: var(--accent); }
+button.btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; }
+button.btn:disabled { opacity: .45; cursor: default; }
+
+/* Toggle switch */
+.switch { position: relative; width: 40px; height: 22px; flex: none; }
+.switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.switch i { position: absolute; inset: 0; border-radius: 11px; background: var(--border); transition: background .15s; pointer-events: none; }
+.switch i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--raised); box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: transform .15s; }
+.switch input:checked + i { background: var(--accent); }
+.switch input:checked + i::after { transform: translateX(18px); background: var(--on-accent); }
+.switch input:focus-visible + i { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Segmented control (theme picker) */
+.segmented { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.segmented button { font: inherit; border: 0; background: var(--surface); color: var(--text); padding: 6px 14px; cursor: pointer; }
+.segmented button + button { border-left: 1px solid var(--border); }
+.segmented button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+
+.status-card { display: flex; gap: 14px; align-items: center; padding: 16px; }
+.status-card .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ok); flex: none; }
+.muted { color: var(--muted); }
+.notes { font-size: 13px; max-height: 220px; min-height: 180px; overflow: auto; padding: 12px 16px; }
+
+/* Footer: Save/Cancel on every tab (shared standard) */
+.footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px; background: var(--chrome);
+  border-top: 1px solid var(--border); }
+.dirty { margin-right: auto; align-self: center; color: var(--muted); font-size: 12.5px; }
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #111; color: #fff;
+  padding: 8px 14px; border-radius: var(--radius); font-size: 13px; opacity: 0; transition: opacity .2s; }
+.toast.show { opacity: 1; }
+</style>
+<script>
+/* Theme: 'system' (default) | 'light' | 'dark'. System follows Windows via prefers-color-scheme. */
+function applyTheme(choice) {
+  const root = document.documentElement;
+  if (choice === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', choice);
+  document.querySelectorAll('[data-theme-choice]').forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset.themeChoice === choice)));
+}
+function wireMockup() {
+  document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', String(t === tab)));
+    document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === tab.dataset.page));
+  }));
+  document.querySelectorAll('[data-theme-choice]').forEach(b =>
+    b.addEventListener('click', () => applyTheme(b.dataset.themeChoice)));
+  const toast = (msg) => { const t = document.querySelector('.toast'); if (!t) return;
+    t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 1600); };
+  document.querySelectorAll('[data-preview]').forEach(b =>
+    b.addEventListener('click', () => toast('Preview: ' + b.dataset.preview)));
+  applyTheme('system');
+}
+document.addEventListener('DOMContentLoaded', wireMockup);
+</script>
+
+<style>
+/* ============ Monitor Mover app layer (after the shared foundation) ============ */
+:root {
+  --accent-light: #1f5fbf;   /* icon monitor blue; white on it 6.2:1, on canvas 5.7:1 */
+  --accent-dark:  #7aaaf2;   /* 6.9:1 on #1c1c1c */
+}
+:root, :root[data-theme="light"] {
+  --warn-bg: #fff1d6; --warn-fg: #6e4300; --warn-bd: #ecc983;
+  --info-bg: #e4edfa; --info-fg: #123f78; --info-bd: #b5cbec;
+  --add-bg: #e7f4e8; --add-fg: #1d5e22; --rem-bg: #fbe7e6; --rem-fg: #8c1d16;
+  --chg-bg: #fff6dc; --chg-fg: #6e4300; --kept-bg: #eceff4; --kept-fg: #4a5160;
+  --err-bg: #fdeceb; --err-bd: #efb8b3;
+  --row-hover: color-mix(in srgb, var(--text) 5%, transparent);
+  --scrim: rgba(20, 18, 14, .38);
+}
+:root[data-theme="dark"] {
+  --warn-bg: #3a2c12; --warn-fg: #f3c77a; --warn-bd: #5e4720;
+  --info-bg: #1b2738; --info-fg: #aac8f1; --info-bd: #2f4566;
+  --add-bg: #1d2e1e; --add-fg: #a6d9a6; --rem-bg: #36201e; --rem-fg: #f2a198;
+  --chg-bg: #33291a; --chg-fg: #f0c97f; --kept-bg: #262830; --kept-fg: #b7bccb;
+  --err-bg: #3a201d; --err-bd: #6a3530;
+  --row-hover: color-mix(in srgb, var(--text) 6%, transparent);
+  --scrim: rgba(0, 0, 0, .5);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --warn-bg: #3a2c12; --warn-fg: #f3c77a; --warn-bd: #5e4720;
+    --info-bg: #1b2738; --info-fg: #aac8f1; --info-bd: #2f4566;
+    --add-bg: #1d2e1e; --add-fg: #a6d9a6; --rem-bg: #36201e; --rem-fg: #f2a198;
+    --chg-bg: #33291a; --chg-fg: #f0c97f; --kept-bg: #262830; --kept-fg: #b7bccb;
+    --err-bg: #3a201d; --err-bd: #6a3530; --scrim: rgba(0, 0, 0, .5);
+  }
+}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+html { scrollbar-color: var(--border) transparent; }
+::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); color: var(--text); }
+body { padding: 56px 16px 32px; align-items: start; }
+.tabular, td, .mono { font-variant-numeric: tabular-nums; }
+.mono { font-family: "Cascadia Mono", "Cascadia Code", Consolas, monospace; font-size: 12px; font-weight: 400; }
+svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.7;
+  stroke-linecap: round; stroke-linejoin: round; }
+
+/* Harness */
+.harness { flex-wrap: wrap; row-gap: 6px; z-index: 100; }
+.harness .grp { display: flex; gap: 4px; align-items: center; }
+.harness button { font: inherit; font-size: 12px; background: #2a2a2a; color: #eee; border: 1px solid #444;
+  border-radius: 4px; padding: 3px 8px; cursor: pointer; }
+.harness button:hover { border-color: #888; }
+.harness button[aria-pressed="true"] { background: #e8e6e1; color: #111; border-color: #e8e6e1; }
+.harness select { font: inherit; font-size: 12px; background: #2a2a2a; color: #eee; border: 1px solid #444;
+  border-radius: 4px; padding: 2px 4px; min-height: 0; }
+.harness .sep { width: 1px; height: 18px; background: #444; }
+.harness label { display: flex; gap: 4px; align-items: center; }
+
+/* Window chrome shared by all windows here */
+.winctl span { cursor: default; }
+.winctl svg.i { width: 14px; height: 14px; stroke-width: 1.4; }
+.window.main { width: 1080px; min-height: 680px; }
+
+/* Main window: menubar + profile bar */
+.menubar { display: flex; gap: 2px; padding: 3px 8px; background: var(--chrome); border-bottom: 1px solid var(--border); }
+.menubar > button { font: inherit; background: none; border: 0; color: var(--text); padding: 4px 10px;
+  border-radius: var(--radius); cursor: pointer; }
+.menubar > button:hover, .menubar > button[aria-expanded="true"] { background: var(--row-hover); }
+.toolbar { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.toolbar .lbl { color: var(--muted); }
+.toolbar select { min-width: 220px; }
+.toolbar .spacer { flex: 1; }
+.btn.icon { display: inline-flex; align-items: center; gap: 6px; }
+.btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+kbd { font: 11.5px var(--font); color: var(--muted); border: 1px solid var(--border); border-bottom-width: 2px;
+  border-radius: 4px; padding: 0 5px; background: var(--surface); }
+
+.panes { flex: 1; display: grid; grid-template-rows: auto 1fr; gap: 0; min-height: 0; }
+.pane { display: flex; flex-direction: column; min-height: 0; padding: 14px 16px 0; }
+.pane + .pane { padding-top: 18px; }
+.pane-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; min-height: 32px; }
+.pane-head h3 { font-size: 14px; margin: 0; font-weight: 600; }
+.pane-head .hint { color: var(--muted); font-size: 12.5px; }
+.pane-head .filter { position: relative; width: 300px; }
+.pane-head .filter input { width: 100%; padding-left: 32px; }
+.pane-head .filter svg { position: absolute; left: 10px; top: 8px; color: var(--muted); }
+.pane-head .count { margin-left: auto; color: var(--muted); font-size: 12.5px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; background: var(--selection); color: var(--text);
+  border-radius: 999px; padding: 2px 4px 2px 10px; font-size: 12.5px; }
+.chip button { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 2px; border-radius: 50%; display: grid; }
+.chip button:hover { color: var(--text); background: var(--row-hover); }
+
+/* Bounded lists scroll vertically inside themselves only; columns are fixed so nothing scrolls sideways. */
+.table-wrap { background: var(--raised); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow-x: hidden; overflow-y: auto; }
+#monTable, #winTable { table-layout: fixed; }
+#monTable td, #winTable td, #monTable th, #winTable th { overflow: hidden; text-overflow: ellipsis; }
+#winTable td.title .app { display: flex; min-width: 0; }
+#winTable td.title .app .t { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.monitors .table-wrap { max-height: 168px; }
+.windows { flex: 1; }
+.windows .table-wrap { flex: 1; max-height: 300px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th { position: sticky; top: 0; background: var(--raised); text-align: left; font-weight: 600; color: var(--muted);
+  font-size: 12px; padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; z-index: 1; }
+td { padding: 7px 10px; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+tbody tr { cursor: default; }
+tbody tr:hover { background: var(--row-hover); }
+tbody tr[aria-selected="true"] { background: var(--selection); }
+tbody tr[aria-selected="true"] td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+td.title { max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
+td .app { display: inline-flex; align-items: center; gap: 8px; }
+.appglyph { width: 18px; height: 18px; border-radius: 4px; display: grid; place-items: center; color: #fff; flex: none; }
+.appglyph svg { width: 12px; height: 12px; stroke-width: 2; }
+.badge { display: inline-block; font-size: 11.5px; padding: 1px 7px; border-radius: 999px; background: var(--selection); color: var(--text); }
+.badge.quiet { background: var(--kept-bg); color: var(--kept-fg); }
+td.path-cell { color: var(--muted); max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+
+.statusbar { display: flex; align-items: center; gap: 12px; padding: 7px 16px; margin-top: 14px; background: var(--chrome);
+  border-top: 1px solid var(--border); font-size: 12.5px; color: var(--muted); }
+.statusbar .msg { color: var(--text); }
+.statusbar .right { margin-left: auto; display: flex; gap: 16px; }
+
+/* Menus (menubar dropdowns + context menus) */
+.menu { position: fixed; min-width: 260px; background: var(--raised); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: 0 10px 28px rgba(0,0,0,.25); padding: 4px; z-index: 60; display: none; color: var(--text); }
+.menu.open { display: block; }
+.menu button { display: flex; width: 100%; align-items: center; gap: 10px; font: inherit; font-size: 13px; color: var(--text);
+  background: none; border: 0; border-radius: var(--radius); padding: 7px 10px; cursor: pointer; text-align: left; }
+.menu button:hover, .menu button:focus-visible { background: var(--selection); outline: none; }
+.menu button:disabled { opacity: .45; cursor: default; background: none; }
+.menu button .sc { margin-left: auto; color: var(--muted); font-size: 12px; }
+.menu hr { border: 0; border-top: 1px solid var(--border); margin: 4px 6px; }
+.menu .sub { position: relative; }
+.menu .sub > .menu { position: absolute; left: calc(100% - 4px); top: -5px; }
+.menu .sub:hover > .menu, .menu .sub:focus-within > .menu { display: block; }
+
+/* Overlays / dialogs */
+.overlay { position: fixed; inset: 0; background: var(--scrim); display: none; place-items: center; z-index: 40; padding: 24px; }
+.overlay.open { display: grid; }
+.window.dialog { min-height: 0; width: 460px; }
+/* Fixed-size Settings: every tab fits without a vertical scrollbar; overflow goes into another tab. */
+.window.settings { width: 720px; height: 600px; min-height: 0; }
+.window.settings .page { overflow: hidden; }
+.window.editor { width: 1000px; min-height: 0; max-height: calc(100vh - 48px); }
+.window.viewer { width: 680px; min-height: 0; }
+.dialog-body { padding: 20px 24px 8px; display: flex; gap: 16px; align-items: flex-start; }
+.dialog-body p { margin: 0 0 10px; }
+.dialog-body .dlg-icon { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+.dlg-icon svg { width: 18px; height: 18px; }
+.dlg-icon.info { background: var(--info-bg); color: var(--info-fg); }
+.dlg-icon.warn { background: var(--warn-bg); color: var(--warn-fg); }
+.dlg-icon.err { background: var(--err-bg); color: var(--danger); }
+.dlg-icon.q { background: var(--selection); color: var(--accent); }
+.dialog-body .content { flex: 1; min-width: 0; }
+.dialog-body input[type="text"] { width: 100%; margin-top: 4px; }
+.field-error { color: var(--danger); font-size: 12.5px; margin-top: 6px; display: none; }
+.footer.plain { background: none; border-top: 0; padding: 12px 24px 20px; }
+.progress { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; margin-top: 12px; }
+.progress i { display: block; height: 100%; width: 100%; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform .2s ease-out; }
+.small { font-size: 12.5px; }
+
+/* Settings */
+.settings .page { padding: 22px 24px; }
+.settings select { min-width: 220px; }
+.settings .row .ctl { display: flex; gap: 8px; align-items: center; }
+.path-row { display: flex; gap: 8px; align-items: center; }
+.path-row input { flex: 1; }
+.alert { display: none; gap: 12px; align-items: flex-start; padding: 12px 14px; margin: 14px 24px 0; border-radius: var(--radius-lg);
+  background: var(--err-bg); border: 1px solid var(--err-bd); color: var(--text); font-size: 13px; }
+.alert.show { display: flex; }
+.alert svg { color: var(--danger); margin-top: 2px; }
+.alert b { display: block; }
+.about-head { display: flex; gap: 14px; align-items: center; margin-bottom: 18px; }
+.about-head img { width: 48px; height: 48px; }
+.about-head h3 { margin: 0; font-size: 18px; }
+.about-head a { color: var(--accent); text-underline-offset: 3px; }
+.kv { display: grid; grid-template-columns: 110px 1fr auto; gap: 10px; align-items: center; margin-bottom: 18px; }
+.kv label { color: var(--muted); }
+/* Read-only paths wrap instead of being cut off; still selectable and copyable. */
+.pathbox { min-width: 0; font-family: "Cascadia Mono", Consolas, monospace; font-size: 12.5px; font-weight: 400; line-height: 1.45;
+  color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 6px 10px; overflow-wrap: anywhere; user-select: text; }
+.about-top { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.about-top .about-head { margin: 0; flex: 1; }
+.settings .notes { height: 200px; max-height: none; min-height: 0; }
+.notes-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+.notes-head b { font-size: 13.5px; }
+.link { background: none; border: 0; color: var(--accent); font: inherit; font-size: 13px; cursor: pointer; padding: 0;
+  text-decoration: underline; text-underline-offset: 3px; }
+.notes ul { margin: 6px 0 12px; padding-left: 18px; }
+.notes h4 { margin: 0; font-size: 13px; }
+.status-card.checking .dot { background: var(--accent); animation: pulse 1s ease-in-out infinite; }
+.status-card.available .dot { background: var(--accent); }
+.status-card.failed .dot { background: var(--danger); }
+@keyframes pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .status-card.checking .dot { animation: none; } }
+
+/* Profile editor */
+.editor .body { padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; overflow: auto; }
+.editor .name-row { display: flex; gap: 10px; align-items: center; }
+.editor .name-row input { width: 340px; }
+.editor .hint { color: var(--muted); font-size: 13px; margin: 0; max-width: 80ch; }
+.editor table input[type="text"], .editor table select { min-height: 28px; padding: 3px 8px; font-size: 13px; }
+.editor table input[type="text"] { width: 160px; }
+.editor .table-wrap { max-height: 200px; }
+.editor td.cap { color: var(--muted); max-width: 230px; overflow: hidden; text-overflow: ellipsis; }
+.editor .notrun { font-size: 11.5px; color: var(--kept-fg); background: var(--kept-bg); padding: 1px 6px; border-radius: 999px; margin-left: 6px; }
+.banner { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: var(--radius-lg); font-weight: 600; border: 1px solid; }
+.banner.changes { background: var(--warn-bg); color: var(--warn-fg); border-color: var(--warn-bd); }
+.banner.clean { background: var(--info-bg); color: var(--info-fg); border-color: var(--info-bd); }
+.banner .tail { font-weight: 400; margin-left: auto; font-size: 12.5px; }
+.diff .table-wrap { max-height: 160px; }
+tr.k-added td { background: var(--add-bg); } tr.k-added td:first-child { color: var(--add-fg); font-weight: 600; }
+tr.k-removed td { background: var(--rem-bg); } tr.k-removed td:first-child { color: var(--rem-fg); font-weight: 600; }
+tr.k-changed td { background: var(--chg-bg); } tr.k-changed td:first-child { color: var(--chg-fg); font-weight: 600; }
+tr.k-kept td { background: var(--kept-bg); color: var(--kept-fg); }
+td .was { color: var(--muted); text-decoration: line-through; margin-right: 6px; }
+.empty-note { text-align: center; color: var(--muted); padding: 22px; background: var(--raised); border: 1px dashed var(--border); border-radius: var(--radius-lg); }
+.check { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 16px; height: 16px; }
+.editor .footer { justify-content: space-between; }
+.editor .footer .end { display: flex; gap: 8px; }
+
+/* Log viewer */
+.log { margin: 0; padding: 14px 16px; height: 320px; overflow: auto; background: var(--raised); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); font: 12.5px/1.6 "Cascadia Mono", Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: hidden; }
+.log .ok { color: var(--ok); } .log .skip { color: var(--muted); } .log .fail { color: var(--danger); }
+.viewer .body { padding: 16px 20px 0; }
+</style>
+</head>
+<body>
+
+<!-- ================= Mockup harness (not part of the app) ================= -->
+<div class="harness" role="toolbar" aria-label="Mockup harness">
+  <b>Monitor Mover v1.2.2 mockup</b>
+  <span class="sep"></span>
+  <label>Screen
+    <select id="screenPicker" aria-label="Open screen">
+      <option value="">Main window</option>
+      <optgroup label="Settings">
+        <option value="settings:general">Settings — General (Appearance)</option>
+        <option value="settings:updates">Settings — Updates</option>
+        <option value="settings:profiles">Settings — Profiles</option>
+        <option value="settings:about">Settings — About</option>
+        <option value="settings:diagnostics">Settings — Diagnostics</option>
+        <option value="settings:error">Settings — save failure</option>
+      </optgroup>
+      <optgroup label="Profiles">
+        <option value="prompt:new">Save Layout (name prompt)</option>
+        <option value="prompt:add">Add to Profile (name prompt)</option>
+        <option value="confirm:overwrite">Confirm overwrite</option>
+        <option value="confirm:delete">Confirm delete</option>
+        <option value="editor:new">Edit Profile — new capture</option>
+        <option value="editor:changes">Edit Profile — changes vs saved</option>
+        <option value="editor:clean">Edit Profile — nothing to save</option>
+        <option value="log:apply">Apply Profile result</option>
+      </optgroup>
+      <optgroup label="Updates">
+        <option value="msg:uptodate">Up to date</option>
+        <option value="msg:checkfail">Check failed</option>
+        <option value="update:available">Update available</option>
+        <option value="update:downloading">Update downloading</option>
+        <option value="update:timeout">Update timed out</option>
+        <option value="update:failed">Update failed</option>
+        <option value="log:history">Full change history</option>
+      </optgroup>
+      <optgroup label="Messages">
+        <option value="msg:folder">Could not open profiles folder</option>
+        <option value="msg:cli-list">CLI: saved profiles (--list)</option>
+        <option value="msg:cli-usage">CLI: usage (--apply)</option>
+        <option value="msg:cli-missing">CLI: profile not found</option>
+      </optgroup>
+      <optgroup label="Menus">
+        <option value="menu:file">File menu</option>
+        <option value="menu:window">Window menu</option>
+        <option value="menu:profiles">Profiles menu</option>
+        <option value="menu:help">Help menu</option>
+        <option value="ctx:window">Window context menu</option>
+        <option value="ctx:monitor">Monitor context menu</option>
+      </optgroup>
+    </select>
+  </label>
+  <span class="sep"></span>
+  <span class="grp">Windows theme
+    <button type="button" data-os="light">Light</button><button type="button" data-os="dark">Dark</button>
+  </span>
+  <span class="sep"></span>
+  <label>Next update check
+    <select id="simCheck"><option value="available">finds 1.2.3</option><option value="uptodate">up to date</option><option value="fail">fails</option></select>
+  </label>
+  <label>Download
+    <select id="simDownload"><option value="ok">succeeds</option><option value="timeout">times out</option><option value="fail">fails</option></select>
+  </label>
+  <label><input type="checkbox" id="simSaveFail"> Settings save fails</label>
+</div>
+
+<!-- Inline SVG icon set: one stroke family -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-min" viewBox="0 0 16 16"><path d="M3 8h10"/></symbol>
+  <symbol id="i-max" viewBox="0 0 16 16"><rect x="3.5" y="3.5" width="9" height="9" rx="1"/></symbol>
+  <symbol id="i-x" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></symbol>
+  <symbol id="i-play" viewBox="0 0 16 16"><path d="M5 3.5v9l7-4.5z"/></symbol>
+  <symbol id="i-save" viewBox="0 0 16 16"><path d="M3 2.5h8l2.5 2.5v8.5h-11z"/><path d="M5.5 2.5v3.5h5v-3.5M5 13.5v-4h6v4"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 16 16"><path d="M10.5 2.5l3 3-8 8h-3v-3z"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 16 16"><path d="M2.5 4.5h11M6 4.5v-2h4v2M4 4.5l.7 9h6.6l.7-9"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v3h-3"/></symbol>
+  <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l3 3"/></symbol>
+  <symbol id="i-info" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M8 7.5v3.5M8 5h.01"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 16 16"><path d="M8 2l6.5 11.5h-13z"/><path d="M8 6.5v3M8 11.5h.01"/></symbol>
+  <symbol id="i-err" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M5.8 5.8l4.4 4.4M10.2 5.8l-4.4 4.4"/></symbol>
+  <symbol id="i-q" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M6.2 6.2a1.9 1.9 0 1 1 2.6 1.8c-.6.3-.8.7-.8 1.3M8 11.5h.01"/></symbol>
+  <symbol id="i-check" viewBox="0 0 16 16"><path d="M3 8.5l3.2 3L13 4.5"/></symbol>
+  <symbol id="i-win" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6h12"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4.5v8h12v-6.5h-6.5l-1.5-1.5z"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 16 16"><rect x="5.5" y="5.5" width="8" height="8" rx="1"/><path d="M10.5 5.5v-3h-8v8h3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></symbol>
+</svg>
+
+<!-- App icon (the real MonitorMover.ico, redrawn as SVG: blue monitor, amber arrow) -->
+<template id="appIconTpl">
+  <svg viewBox="0 0 48 48" class="app-icon" aria-hidden="true"><rect x="4" y="6" width="40" height="28" rx="4" fill="#3a78d6"/><rect x="7.5" y="9.5" width="33" height="21" rx="1.5" fill="#0d1a2c"/><path d="M13 17.5h14v-4.5l9 7-9 7v-4.5h-14z" fill="#f2b23c"/><path d="M22 34h4l1.5 5h-7z" fill="#3a78d6"/><rect x="14" y="39" width="20" height="3" rx="1.5" fill="#3a78d6"/></svg>
+</template>
+
+<!-- ================= Main window ================= -->
+<div class="window main" id="mainWin" aria-label="Monitor Mover main window">
+  <div class="titlebar">
+    <span data-icon></span>
+    <span class="title">Monitor Mover <small>(v1.2.2)</small></span>
+    <div class="winctl"><span><svg class="i"><use href="#i-min"/></svg></span><span><svg class="i"><use href="#i-max"/></svg></span><span><svg class="i"><use href="#i-x"/></svg></span></div>
+  </div>
+  <nav class="menubar" aria-label="Menu">
+    <button type="button" data-menu="file" aria-haspopup="true" aria-expanded="false">File</button>
+    <button type="button" data-menu="window" aria-haspopup="true" aria-expanded="false">Window</button>
+    <button type="button" data-menu="profiles" aria-haspopup="true" aria-expanded="false">Profiles</button>
+    <button type="button" data-menu="help" aria-haspopup="true" aria-expanded="false">Help</button>
+  </nav>
+  <div class="toolbar">
+    <label class="lbl" for="profileCombo">Profile</label>
+    <select id="profileCombo"></select>
+    <button class="btn primary icon" type="button" data-act="apply"><svg class="i"><use href="#i-play"/></svg>Apply</button>
+    <button class="btn icon" type="button" data-act="saveLayout"><svg class="i"><use href="#i-save"/></svg>Save Current Layout…</button>
+    <button class="btn icon" type="button" data-act="edit"><svg class="i"><use href="#i-edit"/></svg>Edit…</button>
+    <button class="btn icon danger" type="button" data-act="delete"><svg class="i"><use href="#i-trash"/></svg>Delete…</button>
+    <span class="spacer"></span>
+    <button class="btn icon" type="button" data-act="refresh" title="Refresh (F5)"><svg class="i"><use href="#i-refresh"/></svg>Refresh <kbd>F5</kbd></button>
+  </div>
+  <div class="panes">
+    <section class="pane monitors" aria-labelledby="monHead">
+      <div class="pane-head">
+        <h3 id="monHead">Monitors</h3>
+        <span class="hint">Click one to filter the window list below</span>
+        <span class="count" id="monCount"></span>
+      </div>
+      <div class="table-wrap">
+        <table id="monTable">
+          <colgroup><col style="width:88px"><col style="width:128px"><col style="width:104px"><col style="width:116px"><col style="width:92px"><col style="width:200px"><col style="width:80px"><col></colgroup>
+          <thead><tr><th>Monitor</th><th>Resolution</th><th>Left-Top</th><th>Right-Bottom</th><th>Primary</th><th>Work Area</th><th>Colors</th><th>Device Name</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="pane windows" aria-labelledby="winHead">
+      <div class="pane-head">
+        <h3 id="winHead">Windows</h3>
+        <span id="scopeChip"></span>
+        <div class="filter">
+          <svg class="i"><use href="#i-search"/></svg>
+          <input type="text" id="filterBox" placeholder="Filter apps: type part of a window or app name…" aria-label="Filter apps">
+        </div>
+        <span class="count" id="winCount"></span>
+      </div>
+      <div class="table-wrap" id="winWrap" tabindex="0" aria-label="Windows list (typing filters)">
+        <table id="winTable">
+          <colgroup><col style="width:28%"><col style="width:76px"><col style="width:100px"><col style="width:104px"><col style="width:100px"><col style="width:13%"><col style="width:12%"><col></colgroup>
+          <thead><tr><th>Title</th><th>Monitor</th><th>Left-Top</th><th>Size</th><th>State</th><th>Class</th><th>Process</th><th>Path</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+  <div class="statusbar" role="status"><span class="msg" id="statusMsg">Ready</span>
+    <span class="right"><span id="selInfo">No window selected</span><span>Move: <kbd>F8</kbd> next · <kbd>F7</kbd> primary</span></span></div>
+</div>
+
+<!-- ================= Menus ================= -->
+<div class="menu" id="menu-file" role="menu">
+  <button type="button" data-act="refresh">Refresh<span class="sc">F5</span></button>
+  <hr>
+  <button type="button" data-act="openFolder">Open Profiles Folder</button>
+  <button type="button" data-act="settings">Settings…</button>
+  <hr>
+  <button type="button" data-preview="Exit closes Monitor Mover">Exit</button>
+</div>
+<div class="menu" id="menu-window" role="menu">
+  <button type="button" data-act="next">Move To Next Monitor<span class="sc">F8</span></button>
+  <button type="button" data-act="primary">Move To Primary Monitor<span class="sc">F7</span></button>
+</div>
+<div class="menu" id="menu-profiles" role="menu">
+  <button type="button" data-act="saveLayout">Save Current Layout to Selected Profile…</button>
+  <button type="button" data-act="saveNew">Save Current Layout as New Profile…</button>
+  <button type="button" data-act="addSel">Add Selected Windows to Profile…</button>
+  <hr>
+  <button type="button" data-act="edit">Edit Selected Profile…</button>
+  <button type="button" data-act="apply">Apply Selected Profile</button>
+  <button type="button" data-act="delete">Delete Selected Profile</button>
+</div>
+<div class="menu" id="menu-help" role="menu">
+  <button type="button" data-act="checkUpdates">Check for Updates…</button>
+  <hr>
+  <button type="button" data-act="about">About</button>
+</div>
+<div class="menu" id="ctx-window" role="menu">
+  <button type="button" data-act="next">Move To Next Monitor<span class="sc">F8</span></button>
+  <button type="button" data-act="primary">Move To Primary Monitor<span class="sc">F7</span></button>
+  <div class="sub"><button type="button" aria-haspopup="true">Move To Monitor<span class="sc">›</span></button><div class="menu" id="ctx-monitors"></div></div>
+  <hr>
+  <button type="button" data-act="addSel">Add Selected to Profile…</button>
+  <button type="button" data-act="front">Bring To Front</button>
+</div>
+<div class="menu" id="ctx-monitor" role="menu">
+  <button type="button" data-act="monThis">Show Windows On This Monitor</button>
+  <button type="button" data-act="monAll">Show Windows On All Monitors</button>
+</div>
+
+<!-- ================= Settings (tabbed; About integrated) ================= -->
+<div class="overlay" id="ov-settings">
+  <div class="window settings" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+    <div class="titlebar">
+      <span data-icon></span>
+      <span class="title" id="setTitle">Monitor Mover Settings <small>(v1.2.2)</small></span>
+      <div class="winctl"><span data-close="settings-cancel" title="Close (discards changes)"><svg class="i"><use href="#i-x"/></svg></span></div>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" type="button" data-page="pg-general" aria-selected="true">General</button>
+      <button class="tab" role="tab" type="button" data-page="pg-updates" aria-selected="false">Updates</button>
+      <button class="tab" role="tab" type="button" data-page="pg-profiles" aria-selected="false">Profiles</button>
+      <button class="tab" role="tab" type="button" data-page="pg-about" aria-selected="false">About</button>
+      <button class="tab" role="tab" type="button" data-page="pg-diagnostics" aria-selected="false">Diagnostics</button>
+    </div>
+    <div class="alert" id="saveError" role="alert">
+      <svg class="i"><use href="#i-err"/></svg>
+      <div><b>Could not save settings</b>
+        <span class="mono">C:\Users\alexander.yazemov\AppData\Roaming\MonitorMover\settings.json</span><br>
+        Access to the path is denied. Your changes are still here; check the folder permissions and click Save again.</div>
+    </div>
+
+    <section class="page active" id="pg-general" role="tabpanel">
+      <div class="section">
+        <h2>Appearance</h2>
+        <div class="card">
+          <div class="row">
+            <div class="label">Theme<span>System follows the Windows app mode (Settings › Personalization › Colors).</span></div>
+            <div class="segmented" role="group" aria-label="Theme">
+              <button type="button" data-draft-theme="system" aria-pressed="true">System</button>
+              <button type="button" data-draft-theme="light" aria-pressed="false">Light</button>
+              <button type="button" data-draft-theme="dark" aria-pressed="false">Dark</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="pg-updates" role="tabpanel">
+      <div class="section">
+        <div class="card status-card" id="updStatus">
+          <span class="dot"></span>
+          <div><b id="updTitle">Monitor Mover is up to date</b><div class="muted small" id="updSub">Version 1.2.2 is the latest stable version · Last checked 2026-10-20 10:52</div></div>
+        </div>
+      </div>
+      <div class="section">
+        <h2>Schedule</h2>
+        <div class="card">
+          <div class="row">
+            <div class="label"><label for="freq">Check for updates</label><span>Checks at startup, then at this interval. Never disables automatic checks.</span></div>
+            <div class="ctl">
+              <select id="freq" title="Check at startup, then at this interval. Never disables automatic checks.">
+                <option value="0">Once an hour</option>
+                <option value="1" selected>Once a day (default)</option>
+                <option value="2">Once a week</option>
+                <option value="3">Once a month</option>
+                <option value="4">Never</option>
+              </select>
+              <button class="btn" type="button" id="checkNow">Check for updates</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="card row" style="min-height:0">
+          <div class="label"><b>Verified installers</b><span>Updates come from official GitHub releases and are verified with SHA-256 before setup runs. Background checks stay quiet when offline; a manual check always reports its result.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="pg-profiles" role="tabpanel">
+      <div class="section">
+        <h2>Profiles</h2>
+        <div class="card">
+          <div class="row" style="flex-direction:column;align-items:stretch;gap:8px">
+            <label for="profDir">Profiles folder</label>
+            <div class="path-row">
+              <input class="path" id="profDir" type="text" readonly value="C:\Users\alexander.yazemov\AppData\Roaming\MonitorMover">
+              <button class="btn icon" type="button" data-act="openFolder"><svg class="i"><use href="#i-folder"/></svg>Open folder</button>
+            </div>
+            <span class="muted small">Profiles are stored in profiles.json in this folder. Upgrades and uninstall keep it.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="pg-about" role="tabpanel">
+      <div class="about-head">
+        <span data-icon data-size="48"></span>
+        <div>
+          <h3>Monitor Mover</h3>
+          <div class="muted small">Version 1.2.2 · Build 1.2.2 · built 2026-10-20 10:54</div>
+          <div class="small">alexlvcom · <a href="#" data-preview="Opens https://github.com/alexlvcom/MonitorMover">github.com/alexlvcom/MonitorMover</a></div>
+        </div>
+      </div>
+      <div class="notes-head"><b>Release notes for v1.2.2:</b><button class="link" type="button" data-open="log:history">View full change history</button></div>
+      <div class="card notes" tabindex="0">
+        <h4>Main changes</h4>
+        <ul><li>Settings now reports an error and stays open when it cannot save, instead of silently discarding your update schedule. Previously a failed write left no settings file, so the app kept checking only once a day.</li></ul>
+        <h4>Other updates</h4>
+        <ul><li>Save applies the new update schedule only after it is written to disk; Cancel, Esc, and closing the window discard changes, following the shared Save/Cancel Settings model.</li></ul>
+      </div>
+    </section>
+
+    <section class="page" id="pg-diagnostics" role="tabpanel">
+      <div class="section">
+        <h2>Locations</h2>
+        <div class="kv">
+          <label>Executable</label><div class="pathbox" id="pExe">C:\Users\alexander.yazemov\AppData\Local\Programs\Monitor Mover\MonitorMover.exe</div><button class="btn" type="button" data-preview="Opens the install folder">Open</button>
+          <label>Profiles file</label><div class="pathbox" id="pProf">C:\Users\alexander.yazemov\AppData\Roaming\MonitorMover\profiles.json</div><button class="btn" type="button" data-preview="Opens the profiles folder">Open</button>
+          <label>Settings file</label><div class="pathbox" id="pSet">C:\Users\alexander.yazemov\AppData\Roaming\MonitorMover\settings.json</div><button class="btn" type="button" data-preview="Opens the settings folder">Open</button>
+        </div>
+      </div>
+      <div class="section">
+        <h2>Support</h2>
+        <div class="card row" style="min-height:0">
+          <div class="label"><b>Copy details</b><span>Copies the version, build, and these locations for a bug report. No settings values or window titles are included.</span></div>
+          <button class="btn icon" type="button" id="copyDetails"><svg class="i"><use href="#i-copy"/></svg>Copy details</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer">
+      <span class="dirty" id="dirtyNote"></span>
+      <button class="btn primary" type="button" id="setSave">Save</button>
+      <button class="btn" type="button" id="setCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= Generic message / confirm / prompt dialog ================= -->
+<div class="overlay" id="ov-msg">
+  <div class="window dialog" role="dialog" aria-modal="true" aria-labelledby="msgTitle">
+    <div class="titlebar">
+      <span data-icon></span>
+      <span class="title" id="msgTitle">Monitor Mover</span>
+      <div class="winctl"><span data-close="msg"><svg class="i"><use href="#i-x"/></svg></span></div>
+    </div>
+    <div class="dialog-body">
+      <span class="dlg-icon info" id="msgIcon"><svg class="i"><use href="#i-info"/></svg></span>
+      <div class="content">
+        <div id="msgText"></div>
+        <div id="msgInputWrap" hidden>
+          <input type="text" id="msgInput" aria-labelledby="msgText">
+          <div class="field-error" id="msgInputErr">Enter a profile name.</div>
+        </div>
+        <div class="progress" id="msgProgress" hidden><i></i></div>
+      </div>
+    </div>
+    <div class="footer plain" id="msgButtons"></div>
+  </div>
+</div>
+
+<!-- ================= Profile editor ================= -->
+<div class="overlay" id="ov-editor">
+  <div class="window editor" role="dialog" aria-modal="true" aria-labelledby="edTitle">
+    <div class="titlebar">
+      <span data-icon></span>
+      <span class="title" id="edTitle">Edit Profile</span>
+      <div class="winctl"><span><svg class="i"><use href="#i-max"/></svg></span><span data-close="editor"><svg class="i"><use href="#i-x"/></svg></span></div>
+    </div>
+    <div class="body">
+      <div class="name-row"><label for="edName">Profile name</label><input type="text" id="edName"></div>
+      <p class="hint">One row per application: every open window of that .exe is sent to its target monitor. Fill in “Title Contains” only to give one particular window a target of its own.</p>
+      <div class="table-wrap">
+        <table id="edTable">
+          <thead><tr><th>On</th><th>Process</th><th>Captured Title</th><th>Title Contains (optional)</th><th>Target Monitor</th><th>State</th><th>Pos / Size</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="diff" id="edDiff">
+        <div class="banner" id="edBanner"></div>
+        <div style="margin-top:10px" id="edDiffBody"></div>
+        <label class="check" style="margin-top:10px"><input type="checkbox" id="edShowUnchanged"> Show unchanged apps</label>
+      </div>
+    </div>
+    <div class="footer">
+      <button class="btn icon" type="button" id="edRemove"><svg class="i"><use href="#i-trash"/></svg>Remove Selected Rows</button>
+      <span class="end"><button class="btn primary" type="button" id="edSave">Save</button><button class="btn" type="button" data-close="editor">Cancel</button></span>
+    </div>
+  </div>
+</div>
+
+<!-- ================= Log viewer (apply result / change history) ================= -->
+<div class="overlay" id="ov-log">
+  <div class="window viewer" role="dialog" aria-modal="true" aria-labelledby="logTitle">
+    <div class="titlebar">
+      <span data-icon></span>
+      <span class="title" id="logTitle">Apply Profile — Office</span>
+      <div class="winctl"><span data-close="log"><svg class="i"><use href="#i-x"/></svg></span></div>
+    </div>
+    <div class="body"><pre class="log" id="logBox" tabindex="0"></pre></div>
+    <div class="footer plain"><button class="btn primary" type="button" data-close="log" id="logClose">Close</button></div>
+  </div>
+</div>
+
+<div class="toast" role="status"></div>
+
+<script>
+/* ================= Monitor Mover mockup behaviour (preview only) ================= */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+/* ---------- Theme: app setting (system/light/dark) resolved against a simulated Windows theme ---------- */
+const theme = { saved: 'system', draft: 'system', os: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light' };
+function paint(choice) {
+  const eff = choice === 'system' ? theme.os : choice;
+  document.documentElement.setAttribute('data-theme', eff);
+  $$('[data-os]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.os === theme.os)));
+  $$('[data-draft-theme]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.draftTheme === theme.draft)));
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => { theme.os = e.matches ? 'dark' : 'light'; paint(isOpen('settings') ? theme.draft : theme.saved); });
+
+/* ---------- Data ---------- */
+const monitors = [
+  { n: 1, res: '2560 × 1440', lt: '0, 0', rb: '2560, 1440', primary: true, work: '0, 0 · 2560 × 1392', colors: 32, dev: '\\\\.\\DISPLAY1' },
+  { n: 2, res: '1920 × 1080', lt: '2560, 180', rb: '4480, 1260', primary: false, work: '2560, 180 · 1920 × 1032', colors: 32, dev: '\\\\.\\DISPLAY2' },
+  { n: 3, res: '1920 × 1080', lt: '-1920, 180', rb: '0, 1260', primary: false, work: '-1920, 180 · 1920 × 1032', colors: 32, dev: '\\\\.\\DISPLAY3' },
+];
+const C = { outlook: '#1f6fc5', term: '#5b5b5b', code: '#1f7ad1', tun: '#b8782d', ff: '#e66000', ps: '#7b4bd6', spot: '#1db954', teams: '#5b5fc7', mm: '#3a78d6', slack: '#611f69' };
+let windows = [
+  { id: 1, title: 'Inbox – alexander.yazemov@ecentria.com – Outlook', mon: 1, lt: '0, 0', size: '2560 × 1392', state: 'Maximized', cls: 'rctrl_renwnd32', proc: 'OUTLOOK.EXE', path: 'C:\\Program Files\\Microsoft Office\\root\\Office16\\OUTLOOK.EXE', c: C.outlook },
+  { id: 2, title: 'C:\\projects — PowerShell', mon: 2, lt: '2600, 220', size: '1400 × 900', state: 'Normal', cls: 'CASCADIA_HOSTING_WINDOW_CLASS', proc: 'WindowsTerminal.exe', path: 'C:\\Program Files\\WindowsApps\\Microsoft.WindowsTerminal\\WindowsTerminal.exe', c: C.term },
+  { id: 3, title: 'MainForm.cs — MonitorMover — Visual Studio Code', mon: 2, lt: '2560, 180', size: '1920 × 1032', state: 'Maximized', cls: 'Chrome_WidgetWin_1', proc: 'Code.exe', path: 'C:\\Users\\alexander.yazemov\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe', c: C.code },
+  { id: 4, title: 'Tunella', mon: 3, lt: '-1920, 180', size: '1920 × 1032', state: 'Maximized', cls: 'HwndWrapper[Tunella;;]', proc: 'Tunella.exe', path: 'C:\\Users\\alexander.yazemov\\AppData\\Local\\Programs\\Tunella\\Tunella.exe', c: C.tun },
+  { id: 5, title: 'GitHub — alexlvcom/MonitorMover — Mozilla Firefox', mon: 1, lt: '320, 120', size: '1600 × 1100', state: 'Normal', cls: 'MozillaWindowClass', proc: 'firefox.exe', path: 'C:\\Program Files\\Mozilla Firefox\\firefox.exe', c: C.ff },
+  { id: 6, title: 'opcart – CartService.php', mon: 1, lt: '0, 0', size: '2560 × 1392', state: 'Minimized', cls: 'SunAwtFrame', proc: 'phpstorm64.exe', path: 'C:\\Program Files\\JetBrains\\PhpStorm 2026.2\\bin\\phpstorm64.exe', c: C.ps },
+  { id: 7, title: 'Spotify Premium', mon: 3, lt: '-1700, 260', size: '1280 × 820', state: 'Normal', cls: 'Chrome_WidgetWin_1', proc: 'Spotify.exe', path: 'C:\\Users\\alexander.yazemov\\AppData\\Roaming\\Spotify\\Spotify.exe', c: C.spot },
+  { id: 8, title: 'Chat | Platform team | Microsoft Teams', mon: 2, lt: '2700, 300', size: '1500 × 880', state: 'Normal', cls: 'TeamsWebView', proc: 'ms-teams.exe', path: 'C:\\Program Files\\WindowsApps\\MSTeams\\ms-teams.exe', c: C.teams },
+  { id: 9, title: 'Monitor Mover (v1.2.2)', mon: 1, lt: '640, 260', size: '1100 × 720', state: 'Normal', cls: 'WindowsForms10.Window.8.app.0', proc: 'MonitorMover.exe', path: 'C:\\Users\\alexander.yazemov\\AppData\\Local\\Programs\\Monitor Mover\\MonitorMover.exe', c: C.mm },
+  { id: 10, title: 'releases | Slack', mon: 3, lt: '-1900, 200', size: '1200 × 960', state: 'Normal', cls: 'Chrome_WidgetWin_1', proc: 'slack.exe', path: 'C:\\Users\\alexander.yazemov\\AppData\\Local\\slack\\slack.exe', c: C.slack },
+];
+const rule = (on, proc, title, tc, mon, state, pos) => ({ on, proc, title, tc, mon, state, pos });
+const profiles = {
+  Home: [rule(true, 'Spotify.exe', 'Spotify Premium', '', 2, 'Normal', '2700, 260 · 1280 × 820'), rule(true, 'firefox.exe', 'Mozilla Firefox', '', 1, 'Maximized', '0, 0 · 2560 × 1392')],
+  Office: [
+    rule(true, 'OUTLOOK.EXE', 'Inbox – Outlook', '', 1, 'Maximized', '0, 0 · 2560 × 1392'),
+    rule(true, 'WindowsTerminal.exe', 'C:\\projects — PowerShell', '', 2, 'Normal', '2600, 220 · 1400 × 900'),
+    rule(true, 'Code.exe', 'MainForm.cs — Visual Studio Code', '', 2, 'Maximized', '2560, 180 · 1920 × 1032'),
+    rule(true, 'Tunella.exe', 'Tunella', '', 3, 'Maximized', '-1920, 180 · 1920 × 1032'),
+    rule(true, 'ms-teams.exe', 'Microsoft Teams', '', 2, 'Normal', '2700, 300 · 1500 × 880'),
+    rule(true, 'Zoom.exe', 'Zoom Workplace', '', 3, 'Normal', '-1800, 220 · 1280 × 800'),
+  ],
+  Presentation: [rule(true, 'POWERPNT.EXE', 'Deck – PowerPoint', '', 2, 'Maximized', '2560, 180 · 1920 × 1032')],
+};
+let selectedProfile = 'Office';
+let monFilter = null, textFilter = '', selection = new Set(), monSel = null;
+
+/* ---------- Rendering ---------- */
+function iconHtml(size = 18) { return $('#appIconTpl').innerHTML.replace('class="app-icon"', `class="app-icon" style="width:${size}px;height:${size}px"`); }
+function renderIcons() { $$('[data-icon]').forEach(el => el.innerHTML = iconHtml(+el.dataset.size || 18)); }
+function renderProfiles() {
+  const names = Object.keys(profiles).sort();
+  $('#profileCombo').innerHTML = names.map(n => `<option${n === selectedProfile ? ' selected' : ''}>${n}</option>`).join('');
+}
+function renderMonitors() {
+  $('#monTable tbody').innerHTML = monitors.map(m => `<tr data-mon="${m.n}" aria-selected="${monSel === m.n}">
+    <td><b>#${m.n}</b></td><td>${m.res}</td><td>${m.lt}</td><td>${m.rb}</td>
+    <td>${m.primary ? '<span class="badge">Primary</span>' : '<span class="muted">—</span>'}</td><td title="${m.work}">${m.work}</td><td>${m.colors}-bit</td><td class="mono" title="${m.dev}">${m.dev}</td></tr>`).join('');
+  $('#monCount').textContent = `${monitors.length} monitors`;
+  $('#ctx-monitors').innerHTML = monitors.map(m => `<button type="button" data-moveto="${m.n}">Monitor #${m.n} (${m.res.replace(' × ', 'x')})</button>`).join('');
+}
+function renderWindows() {
+  const t = textFilter.toLowerCase();
+  const shown = windows.filter(w => (!monFilter || w.mon === monFilter) && (!t || w.title.toLowerCase().includes(t) || w.proc.toLowerCase().includes(t)));
+  $('#winTable tbody').innerHTML = shown.length ? shown.map(w => `<tr data-win="${w.id}" aria-selected="${selection.has(w.id)}">
+    <td class="title" title="${esc(w.title)}"><span class="app"><span class="appglyph" style="background:${w.c}"><svg class="i"><use href="#i-win"/></svg></span><span class="t">${esc(w.title)}</span></span></td>
+    <td>#${w.mon}</td><td>${w.lt}</td><td>${w.size}</td><td>${w.state === 'Normal' ? 'Normal' : `<span class="badge quiet">${w.state}</span>`}</td>
+    <td class="muted" title="${esc(w.cls)}">${esc(w.cls)}</td><td title="${esc(w.proc)}">${w.proc}</td><td class="path-cell mono" title="${esc(w.path)}">${esc(w.path)}</td></tr>`).join('')
+    : `<tr><td colspan="8"><div class="empty-note" style="border:0">No windows match “${esc(textFilter)}”${monFilter ? ` on monitor #${monFilter}` : ''}. Press Esc to clear the filter.</div></td></tr>`;
+  $('#winCount').textContent = `${shown.length} of ${windows.length} shown`;
+  $('#scopeChip').innerHTML = monFilter ? `<span class="chip">Monitor #${monFilter}<button type="button" aria-label="Show all monitors" data-act="monAll"><svg class="i" style="width:12px;height:12px"><use href="#i-x"/></svg></button></span>` : '<span class="muted small">All monitors</span>';
+  const n = selection.size;
+  $('#selInfo').textContent = n ? `${n} window${n > 1 ? 's' : ''} selected` : 'No window selected';
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function status(msg) { $('#statusMsg').textContent = msg; }
+function toast(msg) { const t = $('.toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 1800); }
+
+/* ---------- Window list interaction ---------- */
+$('#winTable').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-win]'); if (!tr) return;
+  const id = +tr.dataset.win;
+  if (e.ctrlKey || e.metaKey) selection.has(id) ? selection.delete(id) : selection.add(id);
+  else selection = new Set([id]);
+  renderWindows();
+});
+$('#winTable').addEventListener('contextmenu', e => {
+  const tr = e.target.closest('tr[data-win]'); if (!tr) return;
+  e.preventDefault(); const id = +tr.dataset.win;
+  if (!selection.has(id)) { selection = new Set([id]); renderWindows(); }
+  openMenu('ctx-window', e.clientX, e.clientY);
+});
+$('#monTable').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-mon]'); if (!tr) return;
+  monSel = +tr.dataset.mon; monFilter = monSel; renderMonitors(); renderWindows();
+  status(`Showing windows on monitor #${monFilter}.`);
+});
+$('#monTable').addEventListener('contextmenu', e => {
+  const tr = e.target.closest('tr[data-mon]'); if (!tr) return;
+  e.preventDefault(); monSel = +tr.dataset.mon; renderMonitors(); openMenu('ctx-monitor', e.clientX, e.clientY);
+});
+$('#filterBox').addEventListener('input', e => { textFilter = e.target.value; renderWindows(); });
+$('#filterBox').addEventListener('keydown', e => { if (e.key === 'Escape') { e.target.value = ''; textFilter = ''; renderWindows(); } });
+$('#winWrap').addEventListener('keydown', e => {
+  const box = $('#filterBox');
+  if (e.key === 'Escape') { box.value = ''; } else if (e.key === 'Backspace') { box.value = box.value.slice(0, -1); }
+  else if (e.key.length === 1 && !e.ctrlKey && !e.altKey) { box.value += e.key; } else return;
+  e.preventDefault(); textFilter = box.value; renderWindows();
+});
+$('#profileCombo').addEventListener('change', e => { selectedProfile = e.target.value; status(`Selected profile “${selectedProfile}”.`); });
+
+/* ---------- Moves (simulated) ---------- */
+function moveTo(target) {
+  const sel = windows.filter(w => selection.has(w.id));
+  if (!sel.length) { status('Select a window first.'); return; }
+  sel.forEach(w => { w.mon = target(w); });
+  renderWindows();
+  return sel.length;
+}
+const actions = {
+  refresh: () => { renderMonitors(); renderWindows(); status(`Refreshed: ${monitors.length} monitors, ${windows.length} windows.`); },
+  next: () => { const n = moveTo(w => w.mon % monitors.length + 1); if (n) status(`Moved ${n} window(s) to next monitor.`); },
+  primary: () => { const n = moveTo(() => 1); if (n) status(`Moved ${n} window(s) to primary monitor.`); },
+  front: () => { if (!selection.size) return status('Select a window first.'); toast('Preview: brings the selected window to the front'); },
+  monThis: () => { monFilter = monSel; renderWindows(); },
+  monAll: () => { monFilter = null; monSel = null; renderMonitors(); renderWindows(); status('Showing windows on all monitors.'); },
+  openFolder: () => toast('Preview: opens Explorer at profiles.json'),
+  settings: () => openSettings('pg-general'),
+  about: () => openSettings('pg-about'),
+  checkUpdates: () => runUpdateCheck(true),
+  apply: () => applyProfile(),
+  saveLayout: () => selectedProfile ? openEditor('changes') : promptName('new'),
+  saveNew: () => promptName('new'),
+  addSel: () => selection.size ? promptName('add') : status('Select one or more windows first.'),
+  edit: () => openEditor('changes'),
+  delete: () => confirmBox('delete'),
+};
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-act]'); if (a) { closeMenus(); actions[a.dataset.act]?.(); return; }
+  const mv = e.target.closest('[data-moveto]'); if (mv) { closeMenus(); const t = +mv.dataset.moveto; const n = moveTo(() => t); if (n) status(`Moved ${n} window(s) to monitor #${t}.`); return; }
+  const op = e.target.closest('[data-open]'); if (op) { openScreen(op.dataset.open); return; }
+  const cl = e.target.closest('[data-close]'); if (cl) { const k = cl.dataset.close; k === 'settings-cancel' ? cancelSettings() : close(k); return; }
+  if (!e.target.closest('.menu') && !e.target.closest('[data-menu]')) closeMenus();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'F5') { e.preventDefault(); actions.refresh(); }
+  if (e.key === 'F7') { e.preventDefault(); actions.primary(); }
+  if (e.key === 'F8') { e.preventDefault(); actions.next(); }
+  if (e.key === 'Escape') {
+    if ($('.menu.open')) return closeMenus();
+    const top = topOverlay(); if (!top) return;
+    if (top === 'settings') cancelSettings(); else if (top === 'msg') msgResolve(null); else close(top);
+  }
+  if (e.key === 'Enter' && topOverlay() === 'settings' && !e.target.matches('button,select')) { e.preventDefault(); saveSettings(); }
+});
+
+/* ---------- Menus ---------- */
+function closeMenus() { $$('.menu.open').forEach(m => m.classList.remove('open')); $$('[data-menu]').forEach(b => b.setAttribute('aria-expanded', 'false')); }
+function openMenu(id, x, y) {
+  closeMenus(); const m = $('#' + id); m.classList.add('open');
+  const r = m.getBoundingClientRect();
+  m.style.left = Math.min(x, innerWidth - r.width - 8) + 'px'; m.style.top = Math.min(y, innerHeight - r.height - 8) + 'px';
+  m.querySelector('button')?.focus({ preventScroll: true });
+}
+$$('[data-menu]').forEach(b => b.addEventListener('click', e => {
+  e.stopPropagation(); const open = b.getAttribute('aria-expanded') === 'true';
+  if (open) return closeMenus();
+  const r = b.getBoundingClientRect(); openMenu('menu-' + b.dataset.menu, r.left, r.bottom + 2); b.setAttribute('aria-expanded', 'true');
+}));
+
+/* ---------- Overlays ---------- */
+let z = 40;
+function open(key) { const o = $('#ov-' + key); o.style.zIndex = ++z; o.classList.add('open'); }
+function close(key) { $('#ov-' + key).classList.remove('open'); }
+function isOpen(key) { return $('#ov-' + key).classList.contains('open'); }
+function topOverlay() { const o = $$('.overlay.open').sort((a, b) => b.style.zIndex - a.style.zIndex)[0]; return o?.id.slice(3); }
+
+/* ---------- Message / confirm / prompt ---------- */
+let msgResolve = () => {};
+function message({ title = 'Monitor Mover', kind = 'info', html, buttons = [{ label: 'OK', primary: true, value: true }], input, progress }) {
+  $('#msgTitle').textContent = title;
+  const ic = { info: 'i-info', warn: 'i-warn', err: 'i-err', q: 'i-q', ok: 'i-check' }[kind];
+  $('#msgIcon').className = 'dlg-icon ' + (kind === 'ok' ? 'info' : kind);
+  $('#msgIcon').innerHTML = `<svg class="i"><use href="#${ic}"/></svg>`;
+  $('#msgText').innerHTML = html;
+  $('#msgInputWrap').hidden = input === undefined; $('#msgInputErr').style.display = 'none';
+  if (input !== undefined) $('#msgInput').value = input;
+  $('#msgProgress').hidden = !progress;
+  $('#msgButtons').innerHTML = buttons.map((b, i) => `<button class="btn${b.primary ? ' primary' : ''}" type="button" data-i="${i}"${b.disabled ? ' disabled' : ''}>${b.label}</button>`).join('');
+  open('msg');
+  setTimeout(() => (input !== undefined ? $('#msgInput') : $('#msgButtons .primary') || $('#msgButtons button'))?.focus(), 0);
+  return new Promise(res => {
+    msgResolve = v => { close('msg'); res(v); };
+    $$('#msgButtons button').forEach(btn => btn.onclick = () => {
+      const b = buttons[+btn.dataset.i];
+      if (b.onClick) return b.onClick();
+      if (input !== undefined && b.value === true && !$('#msgInput').value.trim()) { $('#msgInputErr').style.display = 'block'; $('#msgInput').focus(); return; }
+      msgResolve(input !== undefined && b.value === true ? $('#msgInput').value.trim() : b.value);
+    });
+  });
+}
+$('#msgInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#msgButtons .primary').click(); } });
+$('[data-close="msg"]').addEventListener('click', e => { e.stopPropagation(); msgResolve(null); });
+
+async function promptName(kind) {
+  const isNew = kind === 'new';
+  const name = await message({ title: isNew ? 'Save Layout' : 'Add to Profile', kind: 'q',
+    html: `<p>${isNew ? 'Name this new profile (e.g. Home, Office):' : 'Add selected windows to which profile? (new or existing name):'}</p>`,
+    input: isNew ? 'Office' : selectedProfile || 'Office',
+    buttons: [{ label: 'OK', primary: true, value: true }, { label: 'Cancel', value: null }] });
+  if (!name) return;
+  if (isNew) {
+    if (profiles[name] && !(await confirmBox('overwrite', name))) return;
+    openEditor('new', name);
+  } else {
+    profiles[name] = profiles[name] || [];
+    windows.filter(w => selection.has(w.id)).forEach(w => {
+      profiles[name] = profiles[name].filter(r => r.proc !== w.proc);
+      profiles[name].push(rule(true, w.proc, w.title, '', w.mon, w.state, `${w.lt} · ${w.size}`));
+    });
+    selectedProfile = name; renderProfiles();
+    status(`Added ${selection.size} window(s) to profile “${name}”.`);
+  }
+}
+async function confirmBox(kind, name = selectedProfile) {
+  if (kind === 'delete') {
+    if (!name) return status('Select a profile first.');
+    const ok = await message({ title: 'Confirm', kind: 'warn', html: `<p>Delete profile “${esc(name)}”?</p><p class="muted small">Its ${profiles[name].length} app rule(s) are removed from profiles.json.</p>`,
+      buttons: [{ label: 'Delete', primary: true, value: true }, { label: 'Cancel', value: false }] });
+    if (ok) { delete profiles[name]; selectedProfile = Object.keys(profiles).sort()[0] || null; renderProfiles(); status(`Deleted profile “${name}”.`); }
+    return ok;
+  }
+  return message({ title: 'Confirm', kind: 'q', html: `<p>Profile “${esc(name)}” exists. Overwrite?</p><p class="muted small">You will review every change before anything is saved.</p>`,
+    buttons: [{ label: 'Overwrite', primary: true, value: true }, { label: 'Cancel', value: false }] });
+}
+
+/* ---------- Apply profile + log viewer ---------- */
+function applyProfile() {
+  const p = selectedProfile && profiles[selectedProfile]; if (!p) return status('Select a profile first.');
+  const lines = p.map(r => {
+    const w = windows.find(w => w.proc === r.proc);
+    if (!r.on) return `SKIP  ${r.proc} "${r.title}" — rule disabled`;
+    if (!w) return `SKIP  ${r.proc} "${r.title}" — no matching window open`;
+    w.mon = r.mon; w.state = r.state;
+    return `OK    ${r.proc} "${w.title}" → monitor #${r.mon} (${r.state})`;
+  });
+  renderWindows();
+  const ok = lines.filter(l => l.startsWith('OK')).length, skipped = lines.length - ok;
+  status(`Applied “${selectedProfile}”: ${ok} window(s) placed${skipped ? `, ${skipped} rule(s) skipped.` : '.'}`);
+  showLog(`Apply Profile — ${selectedProfile}`, lines);
+}
+function showLog(title, lines) {
+  $('#logTitle').textContent = title;
+  $('#logBox').innerHTML = lines.map(l => { const c = /^OK/.test(l) ? 'ok' : /^SKIP/.test(l) ? 'skip' : /^FAIL/.test(l) ? 'fail' : ''; return c ? `<span class="${c}">${esc(l)}</span>` : esc(l); }).join('\n');
+  open('log'); setTimeout(() => $('#logClose').focus(), 0);
+}
+const HISTORY = `# Changelog
+
+## 1.2.2 - 2026-10-20
+
+### Main changes
+- Settings now reports an error and stays open when it cannot save, instead of silently
+  discarding your update schedule.
+
+### Other updates
+- Save applies the new update schedule only after it is written to disk; Cancel, Esc, and
+  closing the window discard changes, following the shared Save/Cancel Settings model.
+
+## 1.2.1 - 2026-10-19
+- Start the update download timeout when Update is clicked. Report timeouts and allow
+  retrying instead of leaving the download dialog stuck.
+
+## 1.2.0 - 2026-10-17
+
+### Main changes
+- Added an Inno Setup Windows installer (MonitorMover-Setup.exe).
+- Added automatic graceful shutdown during upgrades and uninstallation.
+- Added in-app update checks against GitHub releases with configurable check frequency.
+
+### Other updates
+- Added a Settings dialog for update check intervals and the profiles folder.
+- Redesigned the About dialog with paths, links, copyable details and release notes.
+
+## 1.1.13 - 2026-09-16
+- …`;
+
+/* ---------- Profile editor ---------- */
+let edRows = [], edBaseline = null, edMode = 'new', edSel = new Set();
+function openEditor(mode, name = selectedProfile) {
+  if (mode !== 'new' && !name) return status('Select a profile first.');
+  edMode = mode; edSel = new Set();
+  if (mode === 'new') {
+    edBaseline = null;
+    edRows = windows.filter(w => w.state !== 'Minimized' || true).map(w => rule(true, w.proc, w.title, '', w.mon, w.state, `${w.lt} · ${w.size}`));
+    $('#edName').value = name;
+  } else {
+    const base = profiles[name] || profiles.Office;
+    edBaseline = { name, rules: base.map(r => ({ ...r })) };
+    edRows = base.map(r => ({ ...r }));
+    if (mode === 'changes') {   // the live capture differs from the saved profile
+      const term = edRows.find(r => r.proc === 'WindowsTerminal.exe'); if (term) term.mon = 1;
+      edRows.push(rule(true, 'firefox.exe', 'GitHub — Mozilla Firefox', '', 1, 'Normal', '320, 120 · 1600 × 1100'));
+      edRows = edRows.filter(r => r.proc !== 'ms-teams.exe');
+    }
+    $('#edName').value = name;
+  }
+  $('#edTitle').textContent = mode === 'new' ? 'Edit Profile — new capture' : 'Edit Profile';
+  $('#edDiff').hidden = !edBaseline;
+  renderEditor(); open('editor'); setTimeout(() => $('#edName').focus(), 0);
+}
+const monOpts = sel => monitors.map(m => `<option value="${m.n}"${m.n === sel ? ' selected' : ''}>#${m.n} · ${m.res}</option>`).join('');
+const running = p => windows.some(w => w.proc === p);
+function renderEditor() {
+  $('#edTable tbody').innerHTML = edRows.map((r, i) => `<tr data-r="${i}" aria-selected="${edSel.has(i)}">
+    <td><input type="checkbox" class="check" data-f="on" ${r.on ? 'checked' : ''} aria-label="Enabled"></td>
+    <td>${r.proc}${running(r.proc) ? '' : '<span class="notrun">not running</span>'}</td>
+    <td class="cap" title="${esc(r.title)}">${esc(r.title)}</td>
+    <td><input type="text" data-f="tc" value="${esc(r.tc)}" placeholder="any window" aria-label="Title contains"></td>
+    <td><select data-f="mon" aria-label="Target monitor">${monOpts(r.mon)}</select></td>
+    <td><select data-f="state" aria-label="State">${['Normal', 'Maximized', 'Minimized'].map(s => `<option${s === r.state ? ' selected' : ''}>${s}</option>`).join('')}</select></td>
+    <td class="muted">${r.pos}</td></tr>`).join('');
+  renderDiff();
+}
+$('#edTable').addEventListener('input', e => {
+  const tr = e.target.closest('tr'); const r = edRows[+tr.dataset.r]; const f = e.target.dataset.f;
+  if (f === 'on') r.on = e.target.checked; else if (f === 'tc') r.tc = e.target.value; else if (f === 'mon') r.mon = +e.target.value; else if (f === 'state') r.state = e.target.value;
+  renderDiff();
+});
+$('#edTable').addEventListener('click', e => {
+  if (e.target.matches('input,select')) return;
+  const tr = e.target.closest('tr[data-r]'); if (!tr) return; const i = +tr.dataset.r;
+  if (e.ctrlKey) edSel.has(i) ? edSel.delete(i) : edSel.add(i); else edSel = new Set([i]);
+  $$('#edTable tbody tr').forEach(t => t.setAttribute('aria-selected', String(edSel.has(+t.dataset.r))));
+});
+$('#edRemove').addEventListener('click', () => { if (!edSel.size) return toast('Select rows to remove first'); edRows = edRows.filter((_, i) => !edSel.has(i)); edSel = new Set(); renderEditor(); });
+$('#edName').addEventListener('input', renderDiff);
+$('#edShowUnchanged').addEventListener('change', renderDiff);
+function renderDiff() {
+  const save = $('#edSave');
+  if (!edBaseline) { save.disabled = !$('#edName').value.trim(); save.textContent = 'Save'; return; }
+  const rows = [];
+  const name = $('#edName').value.trim() || edBaseline.name;
+  if (name !== edBaseline.name) rows.push({ k: 'changed', app: '(profile name)', note: `${edBaseline.name} → ${name}` });
+  edBaseline.rules.forEach(b => {
+    const n = edRows.find(r => r.proc === b.proc);
+    if (!n) rows.push({ k: running(b.proc) ? 'removed' : 'kept', app: b.proc, mon: `#${b.mon}`, state: b.state, note: running(b.proc) ? 'rule removed' : 'not running — rule kept' });
+    else if (n.mon !== b.mon || n.state !== b.state || n.on !== b.on || n.tc !== b.tc) rows.push({ k: 'changed', app: b.proc, mon: n.mon !== b.mon ? `<span class="was">#${b.mon}</span>#${n.mon}` : `#${n.mon}`, state: n.state !== b.state ? `<span class="was">${b.state}</span>${n.state}` : n.state, pos: n.pos.split(' · ')[0], size: n.pos.split(' · ')[1], note: n.on !== b.on ? (n.on ? 'enabled' : 'disabled') : n.tc !== b.tc ? 'title filter changed' : '' });
+    else rows.push({ k: 'unchanged', app: b.proc, mon: `#${b.mon}`, state: b.state, pos: b.pos.split(' · ')[0], size: b.pos.split(' · ')[1], note: '' });
+  });
+  edRows.filter(r => !edBaseline.rules.some(b => b.proc === r.proc)).forEach(r => rows.push({ k: 'added', app: r.proc, mon: `#${r.mon}`, state: r.state, pos: r.pos.split(' · ')[0], size: r.pos.split(' · ')[1], note: '' }));
+  const changes = rows.filter(r => ['added', 'removed', 'changed'].includes(r.k)), kept = rows.filter(r => r.k === 'kept'), unchanged = rows.filter(r => r.k === 'unchanged');
+  const tail = [kept.length && `${kept.length} app(s) not running — rules kept`, unchanged.length && `${unchanged.length} app(s) unchanged`].filter(Boolean).join(' · ');
+  const b = $('#edBanner');
+  if (changes.length) { b.className = 'banner changes'; b.innerHTML = `<svg class="i"><use href="#i-warn"/></svg>${changes.length} change${changes.length > 1 ? 's' : ''} to save vs the saved profile “${esc(edBaseline.name)}”<span class="tail">${tail}</span>`; }
+  else { b.className = 'banner clean'; b.innerHTML = `<svg class="i"><use href="#i-check"/></svg>No changes to save — this layout already matches the saved profile “${esc(edBaseline.name)}”<span class="tail">${tail}</span>`; }
+  const shown = [...changes, ...kept, ...($('#edShowUnchanged').checked ? unchanged : [])];
+  const label = { added: '+ added', removed: '− removed', changed: '~ changed', kept: '= kept', unchanged: 'unchanged' };
+  $('#edDiffBody').innerHTML = shown.length ? `<div class="table-wrap"><table><thead><tr><th>Change</th><th>Application</th><th>Monitor</th><th>State</th><th>Position</th><th>Size</th><th>Note</th></tr></thead><tbody>${shown.map(r => `<tr class="k-${r.k}"><td>${label[r.k]}</td><td>${r.app}</td><td>${r.mon || ''}</td><td>${r.state || ''}</td><td>${r.pos || ''}</td><td>${r.size || ''}</td><td>${r.note || ''}</td></tr>`).join('')}</tbody></table></div>`
+    : `<div class="empty-note">Nothing differs from the saved profile, so Save is disabled.<br>Move a window and re-open this dialog, or tick “Show unchanged apps” to review what the profile currently holds.</div>`;
+  save.disabled = changes.length === 0; save.textContent = changes.length ? 'Save' : 'Nothing to Save';
+}
+$('#edSave').addEventListener('click', () => {
+  const name = $('#edName').value.trim(); if (!name) return;
+  if (edBaseline && name !== edBaseline.name) delete profiles[edBaseline.name];
+  profiles[name] = edRows.map(r => ({ ...r })); selectedProfile = name; renderProfiles(); close('editor');
+  const on = edRows.filter(r => r.on).length;
+  status(edBaseline ? `Saved “${name}”: changes applied, ${on} enabled app rule(s).` : `Saved profile “${name}” with ${on} enabled app rule(s).`);
+});
+
+/* ---------- Settings (draft model) ---------- */
+const settings = { freq: '1' };
+function openSettings(page) {
+  theme.draft = theme.saved; $('#freq').value = settings.freq; $('#saveError').classList.remove('show');
+  selectTab(page); paint(theme.draft); updateDirty(); open('settings');
+  setTimeout(() => $(`.tab[data-page="${page}"]`).focus(), 0);
+}
+function selectTab(page) { $$('.settings .tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.page === page))); $$('.settings .page').forEach(p => p.classList.toggle('active', p.id === page)); }
+function dirty() { return theme.draft !== theme.saved || $('#freq').value !== settings.freq; }
+function updateDirty() { $('#dirtyNote').textContent = dirty() ? 'Unsaved changes' : ''; }
+$$('[data-draft-theme]').forEach(b => b.addEventListener('click', () => { theme.draft = b.dataset.draftTheme; paint(theme.draft); updateDirty(); }));
+$('#freq').addEventListener('change', updateDirty);
+function saveSettings() {
+  if ($('#simSaveFail').checked) { $('#saveError').classList.add('show'); $('#setSave').focus(); return; }
+  theme.saved = theme.draft; settings.freq = $('#freq').value; close('settings'); paint(theme.saved);
+  const f = $('#freq').selectedOptions[0].textContent.replace(' (default)', '').toLowerCase();
+  status(`Settings saved. Update checks: ${f}.`);
+}
+function cancelSettings() { theme.draft = theme.saved; paint(theme.saved); close('settings'); }
+$('#setSave').addEventListener('click', saveSettings);
+$('#setCancel').addEventListener('click', cancelSettings);
+$('#copyDetails').addEventListener('click', () => toast('Application details copied to clipboard'));
+$('#checkNow').addEventListener('click', () => runUpdateCheck(true, true));
+
+/* ---------- Updates ---------- */
+function setUpdCard(kind, title, sub) { const c = $('#updStatus'); c.className = 'card status-card ' + kind; $('#updTitle').textContent = title; $('#updSub').textContent = sub; }
+async function runUpdateCheck(manual, fromSettings = false) {
+  const btn = $('#checkNow'); btn.disabled = true;
+  setUpdCard('checking', 'Checking for updates…', 'Contacting GitHub releases');
+  status('Checking for updates…');
+  await new Promise(r => setTimeout(r, 900)); btn.disabled = false;
+  const sim = $('#simCheck').value;
+  if (sim === 'uptodate') {
+    setUpdCard('', 'Monitor Mover is up to date', 'Version 1.2.2 is the latest stable version · Last checked just now'); status('Ready');
+    if (manual) message({ html: '<p>You are running version 1.2.2.</p><p>No newer installer version is available.</p>' });
+  } else if (sim === 'fail') {
+    setUpdCard('failed', 'Could not check for updates', 'Last successful check 2026-10-20 10:52 · try again later'); status('Update check failed.');
+    if (manual) message({ kind: 'warn', html: '<p>Could not check for updates. Please try again later.</p><p class="muted small">No such host is known. (api.github.com:443)</p>' });
+  } else {
+    setUpdCard('available', 'Version 1.2.3 is available', 'You have 1.2.2 · Last checked just now'); status('Version 1.2.3 is available.');
+    updateDialog('available');
+  }
+}
+function updateDialog(state) {
+  const base = '<p><b>Version 1.2.3 is available.</b> You have 1.2.2.</p>';
+  const body = { available: base + '<p class="muted">Update downloads and verifies the installer, then opens setup. Setup closes Monitor Mover and restarts it after updating.</p>',
+    downloading: base + '<p>Downloading and verifying the installer…</p><p class="muted small" id="dlPct">0 of 47.1 MB</p>',
+    timeout: base + '<p>The download timed out. Check your connection and click Update to try again.</p>',
+    failed: base + '<p>Update failed. Please try again.</p><p class="muted small">Installer checksum did not match. The installer was not started.</p>' }[state];
+  const kind = state === 'timeout' || state === 'failed' ? 'warn' : 'info';
+  message({ title: 'Update Monitor Mover (v1.2.2)', kind, html: body, progress: state === 'downloading',
+    buttons: [{ label: 'Update', primary: true, disabled: state === 'downloading', onClick: startDownload }, { label: 'Later', value: false }] });
+  if (state === 'downloading') animateDownload();
+}
+function startDownload() { updateDialog('downloading'); }
+function animateDownload() {
+  const bar = $('#msgProgress i'); let p = 0; bar.style.transform = 'scaleX(0)';
+  const sim = $('#simDownload').value, stopAt = sim === 'ok' ? 100 : 62;
+  const t = setInterval(() => {
+    if (!isOpen('msg')) return clearInterval(t);
+    p = Math.min(stopAt, p + 9); bar.style.transform = `scaleX(${p / 100})`;
+    const pct = $('#dlPct'); if (pct) pct.textContent = `${(47.1 * p / 100).toFixed(1)} of 47.1 MB`;
+    if (p >= stopAt) {
+      clearInterval(t);
+      setTimeout(() => {
+        if (!isOpen('msg')) return;
+        if (sim === 'ok') { msgResolve(true); status('Verified installer opened. Setup will close Monitor Mover and restart it.'); toast('Preview: setup opens; Monitor Mover keeps running until setup closes it'); }
+        else updateDialog(sim === 'timeout' ? 'timeout' : 'failed');
+      }, 400);
+    }
+  }, 180);
+}
+
+/* ---------- Harness: open any screen ---------- */
+function openScreen(v) {
+  closeMenus();
+  const [kind, arg] = v.split(':');
+  if (kind === 'settings') {
+    if (arg === 'error') { openSettings('pg-updates'); $('#freq').value = '0'; updateDirty(); $('#saveError').classList.add('show'); }
+    else openSettings('pg-' + arg);
+  }
+  else if (kind === 'prompt') promptName(arg);
+  else if (kind === 'confirm') confirmBox(arg);
+  else if (kind === 'editor') openEditor(arg === 'new' ? 'new' : arg, arg === 'clean' ? 'Home' : 'Office');
+  else if (kind === 'log') arg === 'apply' ? (selectedProfile = 'Office', renderProfiles(), applyProfile()) : showLog('Monitor Mover Change History', HISTORY.split('\n'));
+  else if (kind === 'update') { if (arg === 'downloading') { updateDialog('downloading'); } else updateDialog(arg); }
+  else if (kind === 'msg') ({
+    uptodate: () => message({ html: '<p>You are running version 1.2.2.</p><p>No newer installer version is available.</p>' }),
+    checkfail: () => message({ kind: 'warn', html: '<p>Could not check for updates. Please try again later.</p><p class="muted small">No such host is known. (api.github.com:443)</p>' }),
+    folder: () => message({ kind: 'warn', html: '<p>Could not open the profiles folder.</p><p class="muted small mono">C:\\Users\\alexander.yazemov\\AppData\\Roaming\\MonitorMover</p><p class="muted small">The system cannot find the path specified.</p>' }),
+    'cli-list': () => message({ html: `<p>Saved profiles:</p><p class="mono">${Object.keys(profiles).sort().join('<br>')}</p>` }),
+    'cli-usage': () => message({ kind: 'warn', html: '<p>Usage:</p><p class="mono">MonitorMover.exe --apply "ProfileName"</p>' }),
+    'cli-missing': () => message({ kind: 'err', html: '<p>Profile “Studio” not found.</p><p class="muted small">Run MonitorMover.exe --list to see saved profiles.</p>' }),
+  })[arg]();
+  else if (kind === 'menu') { const b = $(`[data-menu="${arg}"]`); b.click(); }
+  else if (kind === 'ctx') {
+    const row = $(arg === 'window' ? '#winTable tbody tr[data-win]' : '#monTable tbody tr[data-mon]');
+    const r = row.getBoundingClientRect();
+    if (arg === 'window') { selection = new Set([+row.dataset.win]); renderWindows(); } else { monSel = +row.dataset.mon; renderMonitors(); }
+    openMenu(arg === 'window' ? 'ctx-window' : 'ctx-monitor', r.left + 140, r.top + 18);
+  }
+}
+$('#screenPicker').addEventListener('change', e => { const v = e.target.value; e.target.value = ''; if (v) setTimeout(() => openScreen(v), 0); });
+$$('[data-os]').forEach(b => b.addEventListener('click', () => { theme.os = b.dataset.os; paint(isOpen('settings') ? theme.draft : theme.saved); }));
+
+/* ---------- Init (after the foundation's wireMockup) ---------- */
+document.addEventListener('DOMContentLoaded', () => {
+  const q = new URLSearchParams(location.search);
+  if (q.get('os') === 'dark' || q.get('os') === 'light') theme.os = q.get('os');
+  renderIcons(); renderProfiles(); renderMonitors(); renderWindows(); paint(theme.saved);
+  const hash = location.hash.slice(1); if (hash) openScreen(decodeURIComponent(hash));
+});
+</script>
+</body>
+</html>
