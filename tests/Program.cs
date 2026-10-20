@@ -69,6 +69,22 @@ try
 }
 finally { if (Directory.Exists(cache)) Directory.Delete(cache, true); }
 
+var settingsRoot = Path.Combine(Path.GetTempPath(), "MonitorMoverSettingsTest-" + Guid.NewGuid().ToString("N"));
+try
+{
+    var settingsPath = Path.Combine(settingsRoot, "MonitorMover", "settings.json");
+    new AppSettings { UpdateCheckFrequency = UpdateCheckFrequency.Hourly }.Save(settingsPath);
+    Check(File.Exists(settingsPath) && File.ReadAllText(settingsPath).Contains("\"UpdateCheckFrequency\": 1"), "settings save creates a missing folder and file");
+    Check(!File.Exists(settingsPath + ".tmp"), "settings save leaves no temp file");
+
+    var blocked = Path.Combine(settingsRoot, "blocked");
+    Directory.CreateDirectory(Path.Combine(blocked, "settings.json"));
+    try { new AppSettings().Save(Path.Combine(blocked, "settings.json")); throw new Exception("settings save failure swallowed"); }
+    catch (IOException) { Console.WriteLine("PASS: settings save failure reported to caller"); }
+    catch (UnauthorizedAccessException) { Console.WriteLine("PASS: settings save failure reported to caller"); }
+}
+finally { if (Directory.Exists(settingsRoot)) Directory.Delete(settingsRoot, true); }
+
 sealed class FakeHandler(byte[] payload, string digest, HttpStatusCode status = HttpStatusCode.OK) : HttpMessageHandler
 {
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)

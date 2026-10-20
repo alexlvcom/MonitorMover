@@ -154,16 +154,31 @@ public sealed class SettingsForm : Form
         };
         saveButton.Click += (_, _) =>
         {
-            _settings.UpdateCheckFrequency = _frequencyCombo.SelectedIndex switch
+            // Save a draft first, so a failed write leaves both the running app and
+            // the dialog's edits unchanged.
+            var draft = new AppSettings
             {
-                0 => UpdateCheckFrequency.Hourly,
-                1 => UpdateCheckFrequency.Daily,
-                2 => UpdateCheckFrequency.Weekly,
-                3 => UpdateCheckFrequency.Monthly,
-                4 => UpdateCheckFrequency.Never,
-                _ => UpdateCheckFrequency.Daily
+                UpdateCheckFrequency = _frequencyCombo.SelectedIndex switch
+                {
+                    0 => UpdateCheckFrequency.Hourly,
+                    1 => UpdateCheckFrequency.Daily,
+                    2 => UpdateCheckFrequency.Weekly,
+                    3 => UpdateCheckFrequency.Monthly,
+                    4 => UpdateCheckFrequency.Never,
+                    _ => UpdateCheckFrequency.Daily
+                },
             };
-            _settings.Save();
+            try
+            {
+                draft.Save();
+            }
+            catch (Exception ex)
+            {
+                DialogResult = DialogResult.None;
+                MessageBox.Show(this, $"Could not save settings to:\n{AppSettings.SettingsFilePath}\n\n{ex.Message}", "Monitor Mover", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            _settings.UpdateCheckFrequency = draft.UpdateCheckFrequency;
         };
 
         var cancelButton = new Button

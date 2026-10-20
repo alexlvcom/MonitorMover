@@ -15,7 +15,7 @@ public static class Changelog
     public static (string Version, string Date, string[] Notes)[] Entries => _parsed.Value.Entries.ToArray();
 
     public static string MarketingVersion =>
-        _parsed.Value.Entries.Count > 0 ? _parsed.Value.Entries[0].Version : "1.2.1";
+        _parsed.Value.Entries.Count > 0 ? _parsed.Value.Entries[0].Version : "1.2.2";
 
     public static string BuildVersion
     {

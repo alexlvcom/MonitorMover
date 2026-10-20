@@ -38,19 +38,25 @@ public sealed class AppSettings
         }
     }
 
-    public void Save()
+    /// <summary>
+    /// Writes the settings atomically. Throws when the file cannot be written so
+    /// Settings can report the failure instead of silently losing the change.
+    /// </summary>
+    public void Save(string? path = null)
     {
+        path ??= SettingsFilePath;
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var json = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
+        var temp = path + ".tmp";
         try
         {
-            Directory.CreateDirectory(SettingsDirectory);
-            var json = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
-            var temp = SettingsFilePath + ".tmp";
             File.WriteAllText(temp, json);
-            File.Move(temp, SettingsFilePath, overwrite: true);
+            File.Move(temp, path, overwrite: true);
         }
         catch
         {
-            // Best effort
+            try { File.Delete(temp); } catch { }
+            throw;
         }
     }
 }

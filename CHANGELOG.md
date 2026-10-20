@@ -2,6 +2,14 @@
 
 All notable changes to Monitor Mover are documented in this file.
 
+## 1.2.2 - 2026-10-20
+
+### Main changes
+- Settings now reports an error and stays open when it cannot save, instead of silently discarding your update schedule. Previously a failed write left no settings file, so the app kept checking only once a day.
+
+### Other updates
+- Save applies the new update schedule only after it is written to disk; Cancel, Esc, and closing the window discard changes, following the shared Save/Cancel Settings model.
+
 ## 1.2.1 - 2026-10-19
 
 - Start the update download timeout when Update is clicked. Report timeouts and allow retrying instead of leaving the download dialog stuck.

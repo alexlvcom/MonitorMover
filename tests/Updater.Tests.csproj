@@ -8,5 +8,6 @@
   <ItemGroup>
     <Compile Include="../UpdateService.cs" Link="UpdateService.cs" />
     <Compile Include="../UpdateSchedule.cs" Link="UpdateSchedule.cs" />
+    <Compile Include="../AppSettings.cs" Link="AppSettings.cs" />
   </ItemGroup>
 </Project>
