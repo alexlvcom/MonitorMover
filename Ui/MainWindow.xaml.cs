@@ -33,8 +33,7 @@ public partial class MainWindow : ThemedWindow
     private DateTime _nextUpdateCheckUtc = DateTime.MaxValue;
     private bool _checkingUpdate;
     private Version? _lastOfferedUpdate;
-    private UpdateStatus _lastUpdateStatus = new(UpdateState.NotChecked, "Not checked yet",
-        $"Version {Changelog.MarketingVersion} · Use Check for updates to look now");
+    private readonly UpdateStatusTracker _updateStatus = new(Changelog.MarketingVersion);
     private ShutdownListenerWindow? _listenerWindow;
     private bool _cleanedUp;
 
@@ -539,7 +538,7 @@ public partial class MainWindow : ThemedWindow
     private void ShowSettings(string? initialTab = null)
     {
         // A copy, so Cancel really cancels.
-        var window = new SettingsWindow(_settings.Clone(), _lastUpdateStatus, saved =>
+        var window = new SettingsWindow(_settings.Clone(), _updateStatus.Status, saved =>
         {
             try
             {
@@ -556,7 +555,7 @@ public partial class MainWindow : ThemedWindow
             ApplyUpdateSchedule();
             ThemeManager.Apply(_settings.Theme);
             return null;
-        }, () => CheckForUpdatesAsync(manual: true, reportInPlace: true)) { Owner = this };
+        }, () => CheckForUpdatesAsync(manual: true, reportInPlace: true), InstallAvailableUpdate) { Owner = this };
         if (initialTab != null) window.SelectTab(initialTab);
         window.ShowDialog();
     }
@@ -585,23 +584,21 @@ public partial class MainWindow : ThemedWindow
         try
         {
             var update = await _updates.CheckAsync(Version.Parse(current), _updateCancellation.Token);
-            if (_cleanedUp) return _lastUpdateStatus;
-            var checkedAt = $"Last checked {DateTime.Now:yyyy-MM-dd HH:mm}";
+            if (_cleanedUp) return _updateStatus.Status;
 
             if (update is null)
             {
-                _lastUpdateStatus = new UpdateStatus(UpdateState.UpToDate, UpdateMessages.Latest(current), checkedAt);
+                _updateStatus.RecordCurrent(DateTime.Now);
                 if (manual && !reportInPlace)
                     MessageDialog.Show(UpdateMessages.Latest(current) + ".", MessageKind.Info, owner: ActiveOwner());
-                return _lastUpdateStatus;
+                return _updateStatus.Status;
             }
 
-            _lastUpdateStatus = new UpdateStatus(UpdateState.Available, $"Version {update.Version.ToString(3)} is available",
-                $"You have {current} · {checkedAt}");
-            if (!manual && _lastOfferedUpdate == update.Version) return _lastUpdateStatus;
+            _updateStatus.RecordNewer(update, DateTime.Now);
+            if (!manual && _lastOfferedUpdate == update.Version) return _updateStatus.Status;
             _lastOfferedUpdate = update.Version;
-            new UpdateWindow(update, _updates, _updateCancellation.Token) { Owner = ActiveOwner() }.ShowDialog();
-            return _lastUpdateStatus;
+            ShowUpdateWindow(update);
+            return _updateStatus.Status;
         }
         catch (OperationCanceledException)
         {
@@ -610,13 +607,24 @@ public partial class MainWindow : ThemedWindow
         catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException
                                       or System.Text.Json.JsonException or KeyNotFoundException or InvalidOperationException)
         {
-            if (_cleanedUp) return _lastUpdateStatus;
+            if (_cleanedUp) return _updateStatus.Status;
+            // Remembered, so Settings opened later shows this failure rather than an older "latest version".
+            _updateStatus.RecordFailed(ex.Message, DateTime.Now);
             if (manual && !reportInPlace)
                 MessageDialog.Show($"Could not check for updates. Please try again later.\n\n{ex.Message}",
                     MessageKind.Warning, owner: ActiveOwner());
-            return new UpdateStatus(UpdateState.Failed, "Could not check for updates", $"Version {current} · {ex.Message}");
+            return _updateStatus.Status;
         }
         finally { _checkingUpdate = false; }
+    }
+
+    private void ShowUpdateWindow(AppUpdate update) =>
+        new UpdateWindow(update, _updates, _updateCancellation.Token) { Owner = ActiveOwner() }.ShowDialog();
+
+    /// <summary>The Settings card's Update action, for the release the last check found.</summary>
+    private void InstallAvailableUpdate()
+    {
+        if (_updateStatus.Available is { } update) ShowUpdateWindow(update);
     }
 
     /// <summary>The window a dialog belongs to: Settings while it is open, otherwise this window.</summary>

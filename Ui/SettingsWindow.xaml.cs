@@ -6,18 +6,6 @@ using AlexLV.WindowsUi;
 
 namespace MonitorMover.Ui;
 
-public enum UpdateState
-{
-    NotChecked,
-    Checking,
-    UpToDate,
-    Available,
-    Failed,
-}
-
-/// <summary>What the Updates tab's status card shows after a check.</summary>
-public sealed record UpdateStatus(UpdateState State, string Title, string Detail);
-
 /// <summary>
 /// Settings: General, Updates, Profiles, About and Diagnostics tabs over one draft copy. Nothing is
 /// stored until Save; Cancel, Esc or the title-bar X discards the draft. The theme is the one live
@@ -35,17 +23,21 @@ public partial class SettingsWindow : ThemedWindow
     private readonly AppSettings _original;
     private readonly Func<AppSettings, string?> _onSave;
     private readonly Func<Task<UpdateStatus>> _onCheckForUpdates;
+    private readonly Action _onInstallUpdate;
     private bool _saved;
     private bool _loading = true;
 
+    /// <param name="updateStatus">The last check's remembered result, so the card never claims "latest" after a failure.</param>
+    /// <param name="onInstallUpdate">Opens the Update dialog for the release the last check found.</param>
     public SettingsWindow(AppSettings draft, UpdateStatus updateStatus, Func<AppSettings, string?> onSave,
-        Func<Task<UpdateStatus>> onCheckForUpdates)
+        Func<Task<UpdateStatus>> onCheckForUpdates, Action onInstallUpdate)
     {
         InitializeComponent();
         _draft = draft;
         _original = draft.Clone();
         _onSave = onSave;
         _onCheckForUpdates = onCheckForUpdates;
+        _onInstallUpdate = onInstallUpdate;
 
         Title = $"{AppInfo.DisplayName} Settings (v{Changelog.MarketingVersion})";
         Frequency.SelectedIndex = Math.Max(0, Array.IndexOf(Frequencies, UpdateSchedule.Normalize(draft.UpdateCheckFrequency)));
@@ -131,10 +123,13 @@ public partial class SettingsWindow : ThemedWindow
         }
     }
 
+    private void UpdateNow_Click(object sender, RoutedEventArgs e) => _onInstallUpdate();
+
     private void ShowUpdateStatus(UpdateStatus status)
     {
         UpdateTitle.Text = status.Title;
         UpdateDetail.Text = status.Detail;
+        UpdateNowButton.Visibility = status.State == UpdateState.Available ? Visibility.Visible : Visibility.Collapsed;
         UpdateDot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, status.State switch
         {
             UpdateState.Failed => "Danger",

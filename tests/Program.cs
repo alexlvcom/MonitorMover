@@ -137,7 +137,24 @@ var nonThemed = Directory.GetFiles(Path.Combine(repo.FullName, "Ui"), "*.xaml")
 Check(nonThemed.Count == 0, "every window derives from ThemedWindow" + (nonThemed.Count > 0 ? ": " + string.Join(", ", nonThemed) : ""));
 Check(MonitorMover.UpdateMessages.Latest("1.3.0") == "You're running the latest version (v1.3.0)",
     "an up-to-date check names the running version as the latest");
-var installerWording = Directory.GetFiles(repo.FullName, "*.cs", SearchOption.AllDirectories)
+// Settings shows the last check's own result, never a stale "latest version".
+var stamp = new DateTime(2026, 10, 20, 13, 0, 0);
+var tracker = new MonitorMover.Ui.UpdateStatusTracker("1.3.0");
+Check(tracker.Status.State == MonitorMover.Ui.UpdateState.NotChecked, "no check yet shows not checked");
+tracker.RecordCurrent(stamp);
+Check(tracker.Status.Title == "You're running the latest version (v1.3.0)" && tracker.Available is null,
+    "a check that finds nothing newer shows the latest version");
+tracker.RecordFailed("No such host is known.", stamp);
+Check(tracker.Status.State == MonitorMover.Ui.UpdateState.Failed && tracker.Status.Detail.Contains("No such host is known.")
+      && !tracker.Status.Title.Contains("latest"), "a failed check after a current one shows the failure, not the latest version");
+var newer = new AppUpdate(new Version(1, 3, 1), new Uri("https://github.com/alexlvcom/MonitorMover/releases/download/v1.3.1/MonitorMover-Setup.exe"), null, new string('a', 64));
+tracker.RecordNewer(newer, stamp);
+Check(tracker.Status.State == MonitorMover.Ui.UpdateState.Available && tracker.Status.Title == "Version 1.3.1 is available"
+      && tracker.Available == newer, "a check that finds a newer release remembers it for the Update action");
+tracker.RecordCurrent(stamp);
+Check(tracker.Available is null && tracker.Status.State == MonitorMover.Ui.UpdateState.UpToDate,
+    "a later current check clears the remembered release");
+var installerWording =Directory.GetFiles(repo.FullName, "*.cs", SearchOption.AllDirectories)
     .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
     .Where(f => File.ReadAllText(f).Contains("No newer " + "installer")).Select(Path.GetFileName).ToList();
 Check(installerWording.Count == 0, "no update result uses \"no newer installer\" wording" + (installerWording.Count > 0 ? ": " + string.Join(", ", installerWording) : ""));
