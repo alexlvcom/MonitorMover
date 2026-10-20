@@ -8,7 +8,7 @@ changes. Dock at the office, undock at home, wake a monitor from sleep — and
 everything piles onto one screen. Save an **Office** profile and a **Home**
 profile once, then apply the right one when you sit down.
 
-![Monitor Mover main window](MonitorMover-screenshot.jpg)
+![Monitor Mover main window](MonitorMover.png)
 
 ## Features
 
