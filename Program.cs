@@ -41,7 +41,11 @@ internal static class Program
         using var mutex = new Mutex(initiallyOwned: true, name: "MonitorMover.Singleton", createdNew: out var createdNew);
         if (!createdNew)
         {
-            var hwnd = NativeMethods.FindWindow(null, AppInfo.MainWindowTitle);
+            // Find the first instance by process, not title: its message dialogs carry the same title.
+            var hwnd = System.Diagnostics.Process.GetProcessesByName("MonitorMover")
+                .Where(p => p.Id != Environment.ProcessId)
+                .Select(p => p.MainWindowHandle)
+                .FirstOrDefault(h => h != IntPtr.Zero);
             if (hwnd != IntPtr.Zero) NativeMethods.SetForegroundWindow(hwnd);
             return;
         }

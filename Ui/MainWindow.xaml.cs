@@ -42,6 +42,9 @@ public partial class MainWindow : ThemedWindow
         InitializeComponent();
         _settings = settings;
         Title = AppInfo.MainWindowTitle;
+        // The version sits at the right of the title row; clicking it opens Settings on Updates.
+        TitleVersion = $"v{Changelog.MarketingVersion}";
+        VersionClick += (_, _) => ShowSettings("Updates");
 
         _updateTimer.Tick += async (_, _) =>
         {

@@ -158,6 +158,12 @@ var installerWording =Directory.GetFiles(repo.FullName, "*.cs", SearchOption.All
     .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
     .Where(f => File.ReadAllText(f).Contains("No newer " + "installer")).Select(Path.GetFileName).ToList();
 Check(installerWording.Count == 0, "no update result uses \"no newer installer\" wording" + (installerWording.Count > 0 ? ": " + string.Join(", ", installerWording) : ""));
+// Versions belong at the right of the title row (TitleVersion), never bracketed into a window title.
+var bracketedTitles = Directory.GetFiles(repo.FullName, "*.cs", SearchOption.AllDirectories)
+    .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
+    .Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), @"Title(\s*=>|\s*=)\s*\$""[^""]*\(v\{"))
+    .Select(Path.GetFileName).ToList();
+Check(bracketedTitles.Count == 0, "no window title carries a bracketed version" + (bracketedTitles.Count > 0 ? ": " + string.Join(", ", bracketedTitles) : ""));
 
 sealed class FakeHandler(byte[] payload, string digest, HttpStatusCode status = HttpStatusCode.OK) : HttpMessageHandler
 {
