@@ -15,6 +15,8 @@ internal static class Program
 
         var settings = AppSettings.Load();
         ThemeManager.Initialize(AppInfo.DisplayName, AppInfo.Accent, settings.Theme);
+        // A pin made from an old portable copy keeps launching it; point pins at this installed EXE.
+        _ = Task.Run(() => ShortcutRepair.RepairTaskbarPins());
         var app = Application.Current!;
         app.Resources.MergedDictionaries.Add(new ResourceDictionary
         {
