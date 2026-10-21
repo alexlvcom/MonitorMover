@@ -47,6 +47,24 @@ public static class Changelog
 
     public static ChangelogEntry? Find(string version) => Entries.FirstOrDefault(e => e.Version == version);
 
+    /// <summary>
+    /// The Main changes of every release after <paramref name="previous"/> up to <paramref name="current"/>, newest first.
+    /// Without a previous release only the current one is included. A release without a Main changes heading keeps all its notes.
+    /// </summary>
+    public static ChangelogEntry[] MainChangesSince(IEnumerable<ChangelogEntry> entries, Version? previous, string current)
+    {
+        if (!Version.TryParse(current, out var target)) return [];
+        return entries
+            .Where(e => Version.TryParse(e.Version, out var v) && (previous is null ? v == target : v > previous && v <= target))
+            .OrderByDescending(e => Version.Parse(e.Version))
+            .Select(e =>
+            {
+                var main = e.Sections.Where(s => string.Equals(s.Heading, "Main changes", StringComparison.OrdinalIgnoreCase)).ToArray();
+                return main.Length > 0 ? e with { Sections = main } : e;
+            })
+            .ToArray();
+    }
+
     /// <summary>Plain-text notes for one release, used by Copy details.</summary>
     public static string GetReleaseNotes(string version)
     {

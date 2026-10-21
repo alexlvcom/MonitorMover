@@ -17,6 +17,7 @@
     <Compile Include="../UpdateStatus.cs" Link="UpdateStatus.cs" />
     <Compile Include="../AppSettings.cs" Link="AppSettings.cs" />
     <Compile Include="../Changelog.cs" Link="Changelog.cs" />
+    <Compile Include="../SharedCheck.cs" Link="SharedCheck.cs" />
     <Compile Include="../AlexLV.WindowsUi/ThemeManager.cs" Link="ThemeManager.cs" />
     <EmbeddedResource Include="../CHANGELOG.md" LogicalName="CHANGELOG.md" />
   </ItemGroup>

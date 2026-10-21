@@ -2,6 +2,13 @@
 
 All notable changes to Monitor Mover are documented in this file.
 
+## 1.3.2 - 2026-10-21
+
+### Main changes
+
+- Check for updates no longer answers "A check is already running" when a background check is in progress; it waits for that check and shows its result. The Update/Later offer no longer blocks the rest of the app, and an open offer is brought to the front instead of opening another.
+- What’s New after an upgrade lists the main changes of every release since the version you had, not only the latest one.
+
 ## 1.3.1 - 2026-10-20
 
 ### Main changes

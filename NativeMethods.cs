@@ -62,6 +62,10 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool SetForegroundWindow(IntPtr hWnd);
 
+    /// <summary>Re-enables a window that a later modal dialog disabled, such as an open update offer behind Settings.</summary>
+    [DllImport("user32.dll")]
+    public static extern bool EnableWindow(IntPtr hWnd, bool bEnable);
+
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     public static extern IntPtr FindWindow(string? lpClassName, string? lpWindowName);
 

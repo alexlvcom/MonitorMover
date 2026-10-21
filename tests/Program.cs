@@ -6,6 +6,7 @@ using System.Text.Json;
 using MonitorMover;
 
 await LatestUpdateTests.RunAsync();
+await SharedCheckTests.RunAsync();
 ReleaseAcknowledgementTests.Run();
 var payload = Encoding.UTF8.GetBytes("test installer payload");
 var digest = Convert.ToHexString(SHA256.HashData(payload));

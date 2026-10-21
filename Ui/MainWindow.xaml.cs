@@ -31,7 +31,8 @@ public partial class MainWindow : ThemedWindow
 
     private bool _populating;
     private DateTime _nextUpdateCheckUtc = DateTime.MaxValue;
-    private bool _checkingUpdate;
+    private readonly SharedCheck<AppUpdate?> _updateCheck = new();
+    private UpdateWindow? _updateWindow;
     private Version? _lastOfferedUpdate;
     private readonly UpdateStatusTracker _updateStatus = new(Changelog.MarketingVersion);
     private ShutdownListenerWindow? _listenerWindow;
@@ -79,6 +80,7 @@ public partial class MainWindow : ThemedWindow
         _cleanedUp = true;
         _updateTimer.Stop();
         _updateCancellation.Cancel();
+        _updateWindow?.Close();
         _updateCancellation.Dispose();
         _updates.Dispose();
         _listenerWindow?.Dispose();
@@ -580,14 +582,14 @@ public partial class MainWindow : ThemedWindow
     private async Task<UpdateStatus> CheckForUpdatesAsync(bool manual, bool reportInPlace = false)
     {
         var current = Changelog.MarketingVersion;
-        if (_checkingUpdate) return new UpdateStatus(UpdateState.Checking, "Checking for updates…", "A check is already running");
+        if (!manual && _updateCheck.IsRunning) return _updateStatus.Status;
         if (_cleanedUp || (!manual && _settings.UpdateCheckFrequency == UpdateCheckFrequency.Never))
             return new UpdateStatus(UpdateState.NotChecked, "Automatic checks are off", $"Version {current}");
 
-        _checkingUpdate = true;
         try
         {
-            var update = await _updates.CheckAsync(Version.Parse(current), _updateCancellation.Token);
+            // The guard covers only the network check. A manual check joins one already in flight and reports its result.
+            var update = await _updateCheck.RunAsync(() => _updates.CheckAsync(Version.Parse(current), _updateCancellation.Token));
             if (_cleanedUp) return _updateStatus.Status;
 
             if (update is null)
@@ -619,11 +621,31 @@ public partial class MainWindow : ThemedWindow
                     MessageKind.Warning, owner: ActiveOwner());
             return _updateStatus.Status;
         }
-        finally { _checkingUpdate = false; }
     }
 
-    private void ShowUpdateWindow(AppUpdate update) =>
-        new UpdateWindow(update, _updates, _updateCancellation.Token) { Owner = ActiveOwner() }.ShowDialog();
+    /// <summary>
+    /// Shows the Update/Later offer modeless, so an unanswered offer never blocks later checks. An open offer refreshes to the
+    /// latest release when Update is clicked, so it is brought forward instead of stacking another.
+    /// </summary>
+    private void ShowUpdateWindow(AppUpdate update)
+    {
+        if (_cleanedUp) return;
+        if (_updateWindow is { } open)
+        {
+            // Settings opened after the offer is modal and disables it; keep the offer usable.
+            NativeMethods.EnableWindow(new System.Windows.Interop.WindowInteropHelper(open).Handle, true);
+            if (open.WindowState == WindowState.Minimized) open.WindowState = WindowState.Normal;
+            open.Activate();
+            return;
+        }
+
+        // Owned by the main window, not Settings, so closing Settings does not close an offer or its download.
+        var window = new UpdateWindow(update, _updates, _updateCancellation.Token) { Owner = this };
+        window.Closed += (_, _) => { if (_updateWindow == window) _updateWindow = null; };
+        _updateWindow = window;
+        window.Show();
+        window.Activate();
+    }
 
     /// <summary>The Settings card's Update action, for the release the last check found.</summary>
     private void InstallAvailableUpdate()

@@ -14,7 +14,9 @@ profile once, then apply the right one when you sit down.
 
 Clicking **Update** checks the latest stable release again before downloading, so a prompt left open skips any superseded versions. The installer URL and SHA-256 both come from that fresh check. If the check fails, the app stops and reports the error instead of installing the old offer.
 
-After installation or an upgrade, **What’s New** shows the running version’s main changes from the bundled changelog, with **Got it** and **View full change history**. It remembers the shown version on this PC, so normal restarts stay quiet.
+After installation or an upgrade, **What’s New** shows the main changes from the bundled changelog, with **Got it** and **View full change history**. After an upgrade it lists every release since the version you had, newest first; a fresh installation shows only the running version. It remembers the shown version on this PC, so normal restarts stay quiet.
+
+**Check for updates** always reports a real result: if a background check is already running, it waits for that check instead of refusing. The Update/Later offer does not block the rest of the app, and checking again while an offer is open brings that offer to the front.
 
 ## Features
 
