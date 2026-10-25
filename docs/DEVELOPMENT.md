@@ -42,8 +42,8 @@ WindowManager.cs          window enumeration and movement
 NativeMethods.cs          P/Invoke surface
 Changelog.cs              embedded CHANGELOG.md reader and version accessor
 Program.cs                entry point, single-instance mutex, and command-line modes
-installer/                Inno Setup script (MonitorMover.iss)
-scripts/                  build-installer.ps1
+installer/                Inno Setup script (MonitorMover.iss) and wizard images (images/)
+scripts/                  build-installer.ps1, generate-installer-images.ps1 (wizard images from the app icon)
 tests/                    updater test suite
 ```
 

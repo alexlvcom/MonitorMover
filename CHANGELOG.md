@@ -2,6 +2,12 @@
 
 All notable changes to Monitor Mover are documented in this file.
 
+## 1.3.3 - 2026-10-25
+
+### Main changes
+
+- The setup wizard now shows the Monitor Mover logo on its welcome, finish and page header panels.
+
 ## 1.3.2 - 2026-10-21
 
 ### Main changes

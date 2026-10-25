@@ -17,10 +17,10 @@
     <ApplicationIcon>MonitorMover.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <Product>Monitor Mover</Product>
-    <Version>1.3.2</Version>
-    <InformationalVersion>1.3.2</InformationalVersion>
-    <FileVersion>1.3.2.0</FileVersion>
-    <AssemblyVersion>1.3.2.0</AssemblyVersion>
+    <Version>1.3.3</Version>
+    <InformationalVersion>1.3.3</InformationalVersion>
+    <FileVersion>1.3.3.0</FileVersion>
+    <AssemblyVersion>1.3.3.0</AssemblyVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
