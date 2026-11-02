@@ -3,7 +3,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Style="{StaticResource KitWindow}"
-        Width="490" SizeToContent="Height" ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+        Width="490" SizeToContent="Height" ResizeMode="NoResize" WindowStartupLocation="CenterScreen" ShowInTaskbar="True">
   <DockPanel>
     <Border DockPanel.Dock="Bottom" Style="{StaticResource Footer}">
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">

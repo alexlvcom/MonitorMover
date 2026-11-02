@@ -8,11 +8,14 @@ public sealed class AppSettings
 {
     public UpdateCheckFrequency UpdateCheckFrequency { get; set; } = UpdateCheckFrequency.Daily;
 
+    /// <summary>When the last update check ran, so the schedule survives restarts and Settings saves.</summary>
+    public DateTime? LastUpdateCheckUtc { get; set; }
+
     /// <summary>Appearance → Theme. System (the default) follows the Windows app mode.</summary>
     public AppTheme Theme { get; set; } = AppTheme.System;
 
     /// <summary>A separate copy for the Settings draft, so Cancel leaves the running settings untouched.</summary>
-    public AppSettings Clone() => new() { UpdateCheckFrequency = UpdateCheckFrequency, Theme = Theme };
+    public AppSettings Clone() => new() { UpdateCheckFrequency = UpdateCheckFrequency, LastUpdateCheckUtc = LastUpdateCheckUtc, Theme = Theme };
 
     public static string SettingsDirectory => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),

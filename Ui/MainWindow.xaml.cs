@@ -18,7 +18,7 @@ public partial class MainWindow : ThemedWindow
     private readonly AppSettings _settings;
     private readonly UpdateService _updates = new();
     private readonly CancellationTokenSource _updateCancellation = new();
-    private readonly DispatcherTimer _updateTimer = new() { Interval = TimeSpan.FromMinutes(15) };
+    private readonly DispatcherTimer _updateTimer = new() { Interval = TimeSpan.FromMinutes(1) };
 
     /// <summary>Per-app small icons for the window list, keyed by exe path or window handle.</summary>
     private readonly Dictionary<string, ImageSource?> _icons = new(StringComparer.OrdinalIgnoreCase);
@@ -30,7 +30,7 @@ public partial class MainWindow : ThemedWindow
     private string? _monitorFilter;
 
     private bool _populating;
-    private DateTime _nextUpdateCheckUtc = DateTime.MaxValue;
+    private DateTime _updateRetryAfterUtc;
     private readonly SharedCheck<AppUpdate?> _updateCheck = new();
     private UpdateWindow? _updateWindow;
     private Version? _lastOfferedUpdate;
@@ -49,9 +49,8 @@ public partial class MainWindow : ThemedWindow
 
         _updateTimer.Tick += async (_, _) =>
         {
-            if (DateTime.UtcNow < _nextUpdateCheckUtc) return;
+            if (!UpdateDue()) return;
             await CheckForUpdatesAsync(manual: false);
-            _nextUpdateCheckUtc = UpdateSchedule.NextCheck(DateTime.UtcNow, _settings.UpdateCheckFrequency);
         };
 
         PreviewKeyDown += OnPreviewKeyDown;
@@ -548,6 +547,8 @@ public partial class MainWindow : ThemedWindow
         {
             try
             {
+                // The draft was copied when Settings opened; a check may have recorded its time since.
+                saved.LastUpdateCheckUtc = _settings.LastUpdateCheckUtc;
                 saved.Save();
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
@@ -560,6 +561,8 @@ public partial class MainWindow : ThemedWindow
             _settings.Theme = saved.Theme;
             ApplyUpdateSchedule();
             ThemeManager.Apply(_settings.Theme);
+            // Saving never pushes the next check out: run it now if it is already due.
+            if (UpdateDue()) _ = CheckForUpdatesAsync(manual: false);
             return null;
         }, () => CheckForUpdatesAsync(manual: true, reportInPlace: true), InstallAvailableUpdate) { Owner = this };
         if (initialTab != null) window.SelectTab(initialTab);
@@ -570,8 +573,33 @@ public partial class MainWindow : ThemedWindow
     {
         _settings.UpdateCheckFrequency = UpdateSchedule.Normalize(_settings.UpdateCheckFrequency);
         _updateTimer.Stop();
-        _nextUpdateCheckUtc = UpdateSchedule.NextCheck(DateTime.UtcNow, _settings.UpdateCheckFrequency);
         if (_settings.UpdateCheckFrequency != UpdateCheckFrequency.Never) _updateTimer.Start();
+    }
+
+    private bool UpdateDue() =>
+        !_cleanedUp && !_updateCheck.IsRunning && DateTime.UtcNow >= _updateRetryAfterUtc
+        && UpdateSchedule.IsDue(_settings.UpdateCheckFrequency, _settings.LastUpdateCheckUtc, DateTime.UtcNow);
+
+    private async Task<AppUpdate?> RunUpdateCheckAsync(string current)
+    {
+        var previous = _settings.LastUpdateCheckUtc;
+        _settings.LastUpdateCheckUtc = DateTime.UtcNow;
+        SaveCheckTime();
+        try { return await _updates.CheckAsync(Version.Parse(current), _updateCancellation.Token); }
+        catch
+        {
+            // A failed check (for example the network is not back yet after sleep) must not silence updates for a whole period.
+            _settings.LastUpdateCheckUtc = previous;
+            _updateRetryAfterUtc = DateTime.UtcNow.AddMinutes(10);
+            SaveCheckTime();
+            throw;
+        }
+    }
+
+    private void SaveCheckTime()
+    {
+        try { _settings.Save(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { /* the next save stores it */ }
     }
 
     /// <summary>
@@ -589,7 +617,7 @@ public partial class MainWindow : ThemedWindow
         try
         {
             // The guard covers only the network check. A manual check joins one already in flight and reports its result.
-            var update = await _updateCheck.RunAsync(() => _updates.CheckAsync(Version.Parse(current), _updateCancellation.Token));
+            var update = await _updateCheck.RunAsync(() => RunUpdateCheckAsync(current));
             if (_cleanedUp) return _updateStatus.Status;
 
             if (update is null)
@@ -639,8 +667,8 @@ public partial class MainWindow : ThemedWindow
             return;
         }
 
-        // Owned by the main window, not Settings, so closing Settings does not close an offer or its download.
-        var window = new UpdateWindow(update, _updates, _updateCancellation.Token) { Owner = this };
+        // No owner: closing Settings or minimizing the main window must never close or hide an unanswered offer.
+        var window = new UpdateWindow(update, _updates, _updateCancellation.Token);
         window.Closed += (_, _) => { if (_updateWindow == window) _updateWindow = null; };
         _updateWindow = window;
         window.Show();
