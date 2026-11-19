@@ -2,6 +2,15 @@
 
 All notable changes to Monitor Mover are documented in this file.
 
+## 1.3.5 - 2026-11-19
+
+### Main changes
+
+- Applying a profile leaves an app alone when it already has a window on its profile monitor. Its size and maximized state stay as they are, and its other windows stay where you put them, such as a Teams meeting on another monitor.
+- Maximized windows moved by a profile or the Move buttons now fill the target monitor and stay there. Before, Firefox, Teams and other apps could end up window-sized while marked maximized, and jump back to the old monitor when clicked or restored.
+- Saving a layout records an app on the monitor where its visible windows are, so a minimized side window no longer decides it (Tunella Workbench was saved on the main monitor because of the minimized Tunella window).
+- After applying a profile, Monitor Mover checks every moved window and places it again if the app undid the move. The result lists windows already in place separately from moved ones.
+
 ## 1.3.4 - 2026-11-03
 
 ### Main changes

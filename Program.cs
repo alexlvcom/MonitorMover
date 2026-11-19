@@ -85,7 +85,7 @@ internal static class Program
                 var windows = WindowManager.GetWindows();
                 var monitors = WindowManager.GetMonitors();
                 var log = ProfileStore.Apply(profile, windows, monitors);
-                var ok = log.Count(l => l.StartsWith("OK"));
+                var ok = log.Count(l => l.StartsWith("OK") || l.StartsWith("KEEP"));
                 // Silent success unless something was skipped/failed.
                 if (ok < log.Count) LogWindow.Show(null, $"Apply Profile — {profile.Name}", log);
                 return true;

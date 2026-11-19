@@ -498,8 +498,10 @@ public partial class MainWindow : ThemedWindow
 
         // One line per window, since a rule can place several instances of an app.
         var ok = log.Count(l => l.StartsWith("OK"));
-        var skipped = log.Count - ok;
-        SetStatus($"Applied \"{profile.Name}\": {ok} window(s) placed" + (skipped > 0 ? $", {skipped} rule(s) skipped." : "."));
+        var kept = log.Count(l => l.StartsWith("KEEP"));
+        var skipped = log.Count - ok - kept;
+        SetStatus($"Applied \"{profile.Name}\": {ok} window(s) moved, {kept} already in place" +
+                  (skipped > 0 ? $", {skipped} skipped or failed." : "."));
         LogWindow.Show(this, $"Apply Profile — {profile.Name}", log);
     }
 

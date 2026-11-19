@@ -144,6 +144,7 @@ internal static class NativeMethods
     public const int SW_SHOWNORMAL = 1;
     public const int SW_SHOWMINIMIZED = 2;
     public const int SW_SHOWMAXIMIZED = 3;
+    public const int SW_SHOWMINNOACTIVE = 7;
     public const int SW_RESTORE = 9;
 
     public const uint SWP_NOSIZE = 0x0001;

@@ -193,7 +193,7 @@ public static class WindowManager
         return Rectangle.Empty;
     }
 
-    /// <summary>Restore rectangle from GetWindowPlacement (virtual-screen coords).</summary>
+    /// <summary>Restore rectangle from GetWindowPlacement, in screen coordinates.</summary>
     private static Rectangle GetNormalBounds(IntPtr hWnd)
     {
         var wp = WINDOWPLACEMENT.Default();
@@ -201,7 +201,10 @@ public static class WindowManager
         {
             var r = wp.rcNormalPosition;
             if (r.Width > 0 && r.Height > 0)
-                return Rectangle.FromLTRB(r.Left, r.Top, r.Right, r.Bottom);
+            {
+                var o = WorkspaceOffset(hWnd);
+                return Rectangle.FromLTRB(r.Left + o.X, r.Top + o.Y, r.Right + o.X, r.Bottom + o.Y);
+            }
         }
         return Rectangle.Empty;
     }
@@ -217,46 +220,25 @@ public static class WindowManager
 
     /// <summary>
     /// Move a window to <paramref name="target"/>, preserving its position relative
-    /// to its current monitor's top-left (MultiMonitorTool "Next Monitor" behaviour).
-    /// A maximized window is restored, moved with physical coordinates, then
-    /// re-maximized so it fills the target monitor — reliable across mixed DPI.
+    /// to its current monitor's top-left (MultiMonitorTool "Next Monitor" behaviour),
+    /// and keeping its state: a maximized window fills the target monitor, a minimized
+    /// one restores there.
     /// </summary>
     public static void MoveToMonitorKeepRelative(WindowInfo w, MonitorInfo target, List<MonitorInfo> monitors)
     {
         var current = MonitorForWindow(w, monitors);
         if (current.DeviceName == target.DeviceName) return;
 
+        // A normal window moves from where it is (a snapped window's restore rectangle is
+        // its pre-snap size); a maximized or minimized one carries its restore rectangle.
+        var from = w.State == WinState.Normal && NativeMethods.GetWindowRect(w.Handle, out RECT r)
+            ? Rectangle.FromLTRB(r.Left, r.Top, r.Right, r.Bottom)
+            : w.NormalBounds;
+        if (from.IsEmpty) return;
+
         // Physical-pixel translation between the two monitor origins.
-        int deltaX = target.Bounds.Left - current.Bounds.Left;
-        int deltaY = target.Bounds.Top - current.Bounds.Top;
-
-        // Minimized windows are parked off-screen; relocate their restore rectangle
-        // via placement so they reappear on the target monitor when restored.
-        if (w.State == WinState.Minimized)
-        {
-            var wp = WINDOWPLACEMENT.Default();
-            if (NativeMethods.GetWindowPlacement(w.Handle, ref wp))
-            {
-                wp.rcNormalPosition.Left += deltaX; wp.rcNormalPosition.Right += deltaX;
-                wp.rcNormalPosition.Top += deltaY; wp.rcNormalPosition.Bottom += deltaY;
-                wp.showCmd = NativeMethods.SW_SHOWMINIMIZED;
-                wp.flags = 0;
-                NativeMethods.SetWindowPlacement(w.Handle, ref wp);
-            }
-            return;
-        }
-
-        bool wasMax = w.State == WinState.Maximized;
-
-        // Restore first so the window is normal and its rect can be relocated; a
-        // still-maximized window ignores SetWindowPos.
-        if (wasMax) NativeMethods.ShowWindow(w.Handle, NativeMethods.SW_RESTORE);
-
-        NativeMethods.GetWindowRect(w.Handle, out RECT r);
-        MoveRaw(w.Handle, r.Left + deltaX, r.Top + deltaY, r.Right - r.Left, r.Bottom - r.Top);
-
-        // Re-maximize; it now fills the target monitor the window sits on.
-        if (wasMax) NativeMethods.ShowWindow(w.Handle, NativeMethods.SW_SHOWMAXIMIZED);
+        from.Offset(target.Bounds.Left - current.Bounds.Left, target.Bounds.Top - current.Bounds.Top);
+        Place(w.Handle, from, w.State);
     }
 
     /// <summary>
@@ -277,21 +259,85 @@ public static class WindowManager
         x = Clamp(x, target.Bounds.Left, Math.Max(target.Bounds.Left, target.Bounds.Right - width));
         y = Clamp(y, target.Bounds.Top, Math.Max(target.Bounds.Top, target.Bounds.Bottom - height));
 
-        // Normalize first so the physical move takes effect, then apply the target state.
-        NativeMethods.ShowWindow(hWnd, NativeMethods.SW_RESTORE);
-        MoveRaw(hWnd, x, y, width, height);
-
-        if (state == WinState.Maximized)
-            NativeMethods.ShowWindow(hWnd, NativeMethods.SW_SHOWMAXIMIZED);
-        else if (state == WinState.Minimized)
-            NativeMethods.ShowWindow(hWnd, NativeMethods.SW_SHOWMINIMIZED);
+        Place(hWnd, new Rectangle(x, y, width, height), state);
     }
 
-    private static void MoveRaw(IntPtr hWnd, int x, int y, int w, int h)
+    /// <summary>
+    /// Give a window a restore rectangle (screen coordinates) and a state through
+    /// SetWindowPlacement, so it never passes through the normal state on its old monitor.
+    /// </summary>
+    /// <remarks>
+    /// Restoring, moving and re-maximizing does not work: Firefox, Teams and other apps
+    /// finish the restore asynchronously and put their old size back after the window is
+    /// maximized again, leaving it flagged maximized but window-sized, with its restore
+    /// position on the old monitor. A minimized window takes a new restore rectangle and
+    /// state from one SetWindowPlacement; a maximized one stays put when only the
+    /// rectangle changes, so it is minimized with the new rectangle first.
+    /// </remarks>
+    private static void Place(IntPtr hWnd, Rectangle normal, WinState state)
     {
-        NativeMethods.SetWindowPos(hWnd, IntPtr.Zero, x, y, w, h,
-            NativeMethods.SWP_NOZORDER | NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_FRAMECHANGED);
+        var wp = WINDOWPLACEMENT.Default();
+        if (!NativeMethods.GetWindowPlacement(hWnd, ref wp)) return;
+
+        var ws = ScreenToWorkspace(hWnd, normal);
+        wp.rcNormalPosition = new RECT { Left = ws.Left, Top = ws.Top, Right = ws.Right, Bottom = ws.Bottom };
+        int keptFlags = wp.flags & NativeMethods.WPF_RESTORETOMAXIMIZED;
+
+        if (NativeMethods.IsZoomed(hWnd))
+        {
+            wp.flags = 0;
+            wp.showCmd = NativeMethods.SW_SHOWMINNOACTIVE;
+            NativeMethods.SetWindowPlacement(hWnd, ref wp);
+        }
+
+        // A minimized target keeps "restore to maximized", so it comes back as it was.
+        wp.flags = state == WinState.Minimized ? keptFlags : 0;
+        wp.showCmd = state switch
+        {
+            WinState.Maximized => NativeMethods.SW_SHOWMAXIMIZED,
+            WinState.Minimized => NativeMethods.SW_SHOWMINNOACTIVE,
+            _ => NativeMethods.SW_SHOWNORMAL
+        };
+        NativeMethods.SetWindowPlacement(hWnd, ref wp);
     }
+
+    /// <summary>
+    /// True when the window is on <paramref name="target"/> in <paramref name="state"/>;
+    /// a maximized window must also fill that monitor's working area.
+    /// </summary>
+    public static bool IsPlaced(IntPtr hWnd, MonitorInfo target, WinState state)
+    {
+        if (state == WinState.Minimized)
+            return NativeMethods.IsIconic(hWnd) && target.Bounds.Contains(Center(GetNormalBounds(hWnd)));
+        if (NativeMethods.IsIconic(hWnd) || NativeMethods.IsZoomed(hWnd) != (state == WinState.Maximized))
+            return false;
+        if (!NativeMethods.GetWindowRect(hWnd, out RECT r)) return false;
+        var rect = Rectangle.FromLTRB(r.Left, r.Top, r.Right, r.Bottom);
+        if (!target.Bounds.Contains(Center(rect))) return false;
+        return state != WinState.Maximized ||
+               (rect.Width >= target.WorkingArea.Width && rect.Height >= target.WorkingArea.Height);
+    }
+
+    /// <summary>
+    /// Placement rectangles are in workspace coordinates, which start at the primary
+    /// monitor's working area rather than its corner (they differ when the taskbar is at
+    /// the top or left). Tool windows use screen coordinates.
+    /// </summary>
+    private static Point WorkspaceOffset(IntPtr hWnd)
+    {
+        long ex = NativeMethods.GetWindowLong(hWnd, NativeMethods.GWL_EXSTYLE);
+        if ((ex & NativeMethods.WS_EX_TOOLWINDOW) != 0) return Point.Empty;
+        return Screen.PrimaryScreen?.WorkingArea.Location ?? Point.Empty;
+    }
+
+    private static Rectangle ScreenToWorkspace(IntPtr hWnd, Rectangle r)
+    {
+        var o = WorkspaceOffset(hWnd);
+        r.Offset(-o.X, -o.Y);
+        return r;
+    }
+
+    private static Point Center(Rectangle r) => new(r.Left + r.Width / 2, r.Top + r.Height / 2);
 
     private static int Clamp(int v, int lo, int hi) => hi < lo ? lo : Math.Max(lo, Math.Min(hi, v));
 }

@@ -21,7 +21,7 @@ After installation or an upgrade, **What’s New** shows the main changes from t
 ## Features
 
 - **Move a window** to the next monitor, the primary monitor, or a specific one.
-- **Layout profiles** — capture every open app's monitor, position, size and state, and restore it later.
+- **Layout profiles** — capture every open app's monitor, position, size and state, and restore it later. Applying a profile moves only apps that are on the wrong monitor; apps already in place keep their size and state.
 - **Survives re-docking** — profiles match monitors on resolution and desktop position, not the device names Windows reshuffles.
 - **Filter apps by keyword** — type part of a window title or process name to find it instantly.
 - **Review before you save** — a colour-coded table shows exactly what moved before a profile is overwritten.

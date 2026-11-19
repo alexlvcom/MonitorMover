@@ -249,12 +249,16 @@ public sealed class ProfileStore
                 .Select(x => (x.Window, x.Rect, Mon: WindowManager.MonitorContaining(x.Rect, monitors)))
                 .ToList();
 
-            // With several windows open the app's home is the monitor most of them sit
-            // on; the first window there supplies the position, size and state.
+            // With several windows open the app's home is the monitor most of its visible
+            // windows sit on: a minimized helper window (Tunella's hidden main window
+            // beside its Workbench) must not outvote the window the user is looking at.
+            // A visible window there supplies the position, size and state.
             var rep = placed
                 .GroupBy(p => p.Mon.DeviceName)
-                .OrderByDescending(g => g.Count())
+                .OrderByDescending(g => g.Count(p => p.Window.State != WinState.Minimized))
+                .ThenByDescending(g => g.Count())
                 .First()
+                .OrderBy(p => p.Window.State == WinState.Minimized ? 1 : 0)
                 .First();
 
             var rule = new AppRule
@@ -317,14 +321,21 @@ public sealed class ProfileStore
     }
 
     /// <summary>
-    /// Apply a profile against the current windows/monitors. Every window of a matched
-    /// executable is placed, not just the first one, so a second instance can't be left
-    /// behind on the monitor it happened to open on. Returns a per-window log.
+    /// Apply a profile against the current windows/monitors and return a per-window log.
     /// </summary>
+    /// <remarks>
+    /// An app with a window already on its profile monitor is left exactly as it is: it
+    /// is home, its size and state are the user's current choice, and any other window it
+    /// has elsewhere (a Teams meeting beside the Teams main window) was put there on
+    /// purpose. Only apps with no window on their monitor are moved, and then every
+    /// window of the executable moves, so a second instance can't be left behind on the
+    /// monitor it happened to open on.
+    /// </remarks>
     public static List<string> Apply(Profile profile, List<WindowInfo> windows, List<MonitorInfo> monitors)
     {
         var log = new List<string>();
         var used = new HashSet<IntPtr>();
+        var moved = new List<(WindowInfo Window, AppRule Rule, MonitorInfo Monitor, int LogLine, int Nudge)>();
 
         // Title-narrowed rules run first: they are explicit exceptions, so they claim
         // their windows before the executable's general rule sweeps up the rest.
@@ -349,18 +360,28 @@ public sealed class ProfileStore
                 continue;
             }
 
+            if (matches.Any(m => m.MonitorDeviceName == mon.DeviceName))
+            {
+                foreach (var match in matches)
+                {
+                    used.Add(match.Handle);
+                    log.Add($"KEEP  {rule.ProcessName} \"{match.Title}\" — already in place");
+                }
+                continue;
+            }
+
             int instance = 0;
             foreach (var match in matches)
             {
+                used.Add(match.Handle);
                 try
                 {
                     // Extra instances land on the same monitor in the same state; only
                     // free-floating ones are nudged so they stay individually reachable.
                     int nudge = rule.State == WinState.Normal ? instance * CascadeStep : 0;
-                    WindowManager.ApplyPlacement(match.Handle, mon,
-                        rule.RelativeX + nudge, rule.RelativeY + nudge, rule.Width, rule.Height, rule.State);
-                    used.Add(match.Handle);
+                    Place(match, rule, mon, nudge);
                     instance++;
+                    moved.Add((match, rule, mon, log.Count, nudge));
                     log.Add($"OK    {rule.ProcessName} \"{match.Title}\" → monitor #{mon.Index + 1} ({rule.State})");
                 }
                 catch (Exception ex)
@@ -369,8 +390,23 @@ public sealed class ProfileStore
                 }
             }
         }
+
+        // Apps settle asynchronously, and some undo part of a placement while they do.
+        // Check each moved window once it has settled and place it again if needed.
+        for (int pass = 0; pass < 2 && moved.Count > 0; pass++)
+        {
+            Thread.Sleep(400);
+            moved = moved.Where(m => !WindowManager.IsPlaced(m.Window.Handle, m.Monitor, m.Rule.State)).ToList();
+            if (pass == 0) foreach (var m in moved) Place(m.Window, m.Rule, m.Monitor, m.Nudge);
+        }
+        foreach (var m in moved)
+            log[m.LogLine] = $"FAIL  {m.Rule.ProcessName} \"{m.Window.Title}\" — did not stay {m.Rule.State.ToString().ToLowerInvariant()} on monitor #{m.Monitor.Index + 1}";
         return log;
     }
+
+    private static void Place(WindowInfo window, AppRule rule, MonitorInfo monitor, int nudge) =>
+        WindowManager.ApplyPlacement(window.Handle, monitor,
+            rule.RelativeX + nudge, rule.RelativeY + nudge, rule.Width, rule.Height, rule.State);
 
     // ------------------------------------------------ layout comparison
 
